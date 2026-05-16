@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+        }
+        .table-section {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .form-section {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0069d9;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .stats {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .stats strong {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>用户管理系统</h1>
+        <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px;">
+            <a href="/follow" class="btn btn-primary">前往关注页面</a>
+            <a href="/batch-create" class="btn btn-success">批量创建用户</a>
+            <a href="/export-users" class="btn btn-info" style="background-color: #17a2b8; color: white;">导出用户信息</a>
+            <a href="/position-setting" class="btn btn-warning">仓位设置</a>
+            <a href="/change" class="btn btn-danger" style="background-color: #dc3545; color: white;">涨幅股票</a>
+        </div>
+        
+        <!-- 提示消息 -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="message {{ category }}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        
+        <div class="grid">
+            <!-- 表格部分 -->
+            <div class="table-section">
+                <div class="stats">
+                    <strong>总用户数: {{ users|length }}</strong>
+                </div>
+                <table>
+                    <tr>
+                        <th>ID</th>
+                        <th>用户名</th>
+                        <th>密码</th>
+                        <th>注册时间</th>
+                        <th>操作</th>
+                    </tr>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.password }}</td>
+                        <td>{{ user.created_at }}</td>
+                        <td>
+                            <form action="{{ url_for('user.toggle_user_status', user_id=user.id) }}" method="POST" style="display: inline; margin-right: 10px;">
+                                {% if user.is_active %}
+                                    <button type="submit" class="btn btn-warning" onclick="return confirm('确定要停用这个用户吗？');">停用</button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-success" onclick="return confirm('确定要启用这个用户吗？');">启用</button>
+                                {% endif %}
+                            </form>
+                            <form action="{{ url_for('user.delete_user', user_id=user.id) }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn btn-danger" onclick="return confirm('确定要删除这个用户吗？');">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                
+                <!-- 分页导航 -->
+                {% if pagination %}
+                <div style="margin-top: 20px; text-align: center;">
+                    <nav>
+                        <ul style="list-style-type: none; padding: 0; display: inline-block;">
+                            <!-- 上一页 -->
+                            {% if pagination.has_prev %}
+                            <li style="display: inline; margin: 0 5px;">
+                                <a href="{{ url_for('user.index', page=pagination.prev_num) }}" class="btn btn-primary">上一页</a>
+                            </li>
+                            {% else %}
+                            <li style="display: inline; margin: 0 5px;">
+                                <span class="btn btn-primary" style="opacity: 0.5; cursor: not-allowed;">上一页</span>
+                            </li>
+                            {% endif %}
+                            
+                            <!-- 页码 -->
+                            {% for page_num in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+                                {% if page_num %}
+                                    {% if page_num == pagination.page %}
+                                    <li style="display: inline; margin: 0 5px;">
+                                        <span class="btn btn-primary" style="background-color: #0056b3;">{{ page_num }}</span>
+                                    </li>
+                                    {% else %}
+                                    <li style="display: inline; margin: 0 5px;">
+                                        <a href="{{ url_for('user.index', page=page_num) }}" class="btn btn-primary">{{ page_num }}</a>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li style="display: inline; margin: 0 5px;">
+                                    <span>...</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            <!-- 下一页 -->
+                            {% if pagination.has_next %}
+                            <li style="display: inline; margin: 0 5px;">
+                                <a href="{{ url_for('user.index', page=pagination.next_num) }}" class="btn btn-primary">下一页</a>
+                            </li>
+                            {% else %}
+                            <li style="display: inline; margin: 0 5px;">
+                                <span class="btn btn-primary" style="opacity: 0.5; cursor: not-allowed;">下一页</span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    <div style="margin-top: 10px;">
+                        <small>第 {{ pagination.page }} 页，共 {{ pagination.pages }} 页，总用户数：{{ total }}</small>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- 注册表单部分 -->
+            <div class="form-section">
+                <h2>用户注册</h2>
+                <form method="POST" onsubmit="return validateForm()">
+                    <div class="form-group">
+                        <label for="username">用户名</label>
+                        <input type="text" id="username" name="username"
+                               required placeholder="请输入用户名"
+                               minlength="3" maxlength="20"
+                               pattern="[a-zA-Z0-9_]+"
+                               title="只能包含字母、数字和下划线，长度3-20位">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">密码</label>
+                        <input type="password" id="password" name="password"
+                               required placeholder="请输入密码"
+                               minlength="6">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirm_password">确认密码</label>
+                        <input type="password" id="confirm_password" name="confirm_password"
+                               required placeholder="请再次输入密码">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">注册</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 表单验证函数
+        function validateForm() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            
+            // 1. 检查用户名格式
+            const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+            if (!usernameRegex.test(username)) {
+                alert('用户名只能包含字母、数字和下划线，长度3-20位');
+                return false;
+            }
+            
+            // 2. 检查密码长度
+            if (password.length < 6) {
+                alert('密码长度不能少于6位');
+                return false;
+            }
+            
+            // 3. 检查密码一致性
+            if (password !== confirmPassword) {
+                alert('两次输入的密码不一致');
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // 热更新功能
+        (function() {
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                const ws = new WebSocket('ws://' + window.location.host + '/_ws');
+                ws.onmessage = function(event) {
+                    if (event.data === 'reload') {
+                        window.location.reload();
+                    }
+                };
+                ws.onerror = function() {
+                    // WebSocket连接失败，使用轮询作为备用方案
+                    let lastModified = new Date().getTime();
+                    setInterval(function() {
+                        fetch(window.location.href + '?_=' + Math.random(), {
+                            method: 'HEAD'
+                        }).then(function(response) {
+                            const currentModified = new Date(response.headers.get('Last-Modified')).getTime();
+                            if (currentModified > lastModified) {
+                                lastModified = currentModified;
+                                window.location.reload();
+                            }
+                        });
+                    }, 2000);
+                };
+            }
+        })();
+    </script>
+</body>
+</html>

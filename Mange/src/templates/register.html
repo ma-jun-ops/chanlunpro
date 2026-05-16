@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户注册</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        .btn {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn:hover {
+            background-color: #0069d9;
+        }
+
+        /* 提示消息样式 - 默认隐藏 */
+        .message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            text-align: center;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+
+        /* 密码要求提示 */
+        .password-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* 注册成功消息 */
+        .success-message {
+            text-align: center;
+            padding: 20px;
+            background-color: #d4edda;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none;
+        }
+        .success-message.show {
+            display: block;
+        }
+        .success-message h2 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+<!-- 在 <div class="container"> 内部，表单上方 -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="message {{ category }}" style="display: block;">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+    <div class="container">
+        <h1>用户注册</h1>
+
+        <!-- 提示消息区域（用于显示错误或成功信息） -->
+        <div id="messageBox" class="message"></div>
+
+        <!-- 注册表单 -->
+        <form id="registerForm" method="POST" onsubmit="return validateForm()">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username"
+                       required placeholder="请输入用户名"
+                       minlength="3" maxlength="20"
+                       pattern="[a-zA-Z0-9_]+"
+                       title="只能包含字母、数字和下划线，长度3-20位">
+            </div>
+
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password"
+                       required placeholder="请输入密码"
+                       minlength="6">
+                <div class="password-hint">密码长度至少6位</div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">确认密码</label>
+                <input type="password" id="confirm_password" name="confirm_password"
+                       required placeholder="请再次输入密码">
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn">注册</button>
+            </div>
+        </form>
+
+        <!-- 注册成功显示区域（模拟提交成功） -->
+        <div id="successMessage" class="success-message">
+            <h2>✓ 注册成功！</h2>
+            <p id="successDetails"></p>
+            <button onclick="resetForm()" class="btn" style="background-color: #28a745;">继续注册</button>
+        </div>
+    </div>
+
+        <script>
+        // 表单验证函数
+        function validateForm() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+
+            hideMessage();
+
+            // 1. 检查用户名格式
+            const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+            if (!usernameRegex.test(username)) {
+                showMessage('用户名只能包含字母、数字和下划线，长度3-20位', 'error');
+                return false; // 阻止提交
+            }
+
+            // 2. 检查密码长度
+            if (password.length < 6) {
+                showMessage('密码长度不能少于6位', 'error');
+                return false; // 阻止提交
+            }
+
+            // 3. 检查密码一致性
+            if (password !== confirmPassword) {
+                showMessage('两次输入的密码不一致', 'error');
+                return false; // 阻止提交
+            }
+
+            // ✅ 验证全部通过，返回 true，允许表单提交给后端
+            return true;
+        }
+
+        // 显示提示消息
+        function showMessage(text, type) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = text;
+            messageBox.className = 'message ' + type;
+            messageBox.style.display = 'block'; // 确保显示
+        }
+
+        // 隐藏提示消息
+        function hideMessage() {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.style.display = 'none';
+            messageBox.textContent = '';
+        }
+
+        // 实时密码匹配检查
+        document.getElementById('confirm_password').addEventListener('input', function() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = this.value;
+            if (confirmPassword.length > 0) {
+                this.style.borderColor = (password !== confirmPassword) ? '#dc3545' : '#28a745';
+            } else {
+                this.style.borderColor = '#ddd';
+            }
+        });
+
+        document.getElementById('password').addEventListener('input', function() {
+            const confirmField = document.getElementById('confirm_password');
+            if (confirmField.value.length > 0) {
+                confirmField.style.borderColor = (this.value !== confirmField.value) ? '#dc3545' : '#28a745';
+            }
+        });
+    </script>
+</body>
+</html>

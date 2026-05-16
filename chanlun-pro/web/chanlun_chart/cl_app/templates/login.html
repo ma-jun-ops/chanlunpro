@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爱数学小女孩的缠论小院 - 门岗</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        body { margin: 0; padding: 0; background: #1e1e2e; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; color: #fff; }
+        .login-card { background: #2d2d3f; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); width: 360px; }
+        h2 { text-align: center; margin-bottom: 30px; color: #00d4ff; letter-spacing: 2px; }
+        .input-group { margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; background: #1a1a2e; border: 1px solid #3f3f5f; color: #fff; border-radius: 6px; box-sizing: border-box; outline: none; }
+        input:focus { border-color: #00d4ff; }
+        .captcha-wrap { margin-top: 10px; position: relative; background: #fff; border-radius: 6px; overflow: hidden; cursor: crosshair; }
+        .captcha-wrap img { width: 100%; display: block; pointer-events: none; }
+        .click-mark { position: absolute; width: 26px; height: 26px; background: #ff4757; border-radius: 50%; color: #fff; display: flex; justify-content: center; align-items: center; font-size: 14px; font-weight: bold; transform: translate(-50%, -50%); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #00d4ff, #0099cc); border: none; color: #fff; font-size: 16px; border-radius: 6px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .msg { text-align: center; margin-top: 15px; color: #ff4757; font-size: 14px; height: 20px; }
+        .header-tip { text-align: center; font-size: 12px; color: #888; margin-bottom: 5px; display: flex; justify-content: space-between;}
+        .refresh-link { color: #00d4ff; cursor: pointer; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2>爱数学小女孩的缠论小院——让我看看谁来了，请您登录</h2>
+
+    <div class="input-group">
+        <input type="text" id="username" placeholder="请输入用户名" autocomplete="off">
+    </div>
+
+    <div class="input-group">
+        <input type="password" id="password" placeholder="请输入密码">
+    </div>
+
+    <div class="input-group">
+        <div class="header-tip">
+            <span id="captcha-prompt">点击刷新获取验证码</span>
+            <a class="refresh-link" onclick="loadCaptcha()">刷新</a>
+        </div>
+        <div id="captcha-box" class="captcha-wrap" onclick="handleCaptchaClick(event)">
+        </div>
+    </div>
+
+    <button class="btn" onclick="submitLogin()">安全登录</button>
+    <div id="msg" class="msg"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+    let captchaData = null;
+    let userClicked = [];
+
+    window.onload = loadCaptcha;
+
+    function loadCaptcha() {
+        userClicked = [];
+        const box = document.getElementById('captcha-box');
+        box.innerHTML = '';
+
+        // 【修改点1】验证码接口改成 /api/my_captcha
+        axios.get('/api/my_captcha').then(res => {
+            captchaData = res.data;
+            document.getElementById('captcha-prompt').innerText = res.data.prompt;
+            document.getElementById('msg').innerText = '';
+            box.innerHTML = `<img src="${res.data.image}" id="cap-img">`;
+        });
+    }
+
+    function handleCaptchaClick(event) {
+        if(!captchaData) return;
+
+        const box = document.getElementById('captcha-box');
+        const rect = box.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const width = rect.width;
+        const height = rect.height;
+        const scaleX = 300 / width;
+        const scaleY = 150 / height;
+        const clickXInImg = x * scaleX;
+        const clickYInImg = y * scaleY;
+
+        let hitWord = null;
+        let minDist = 9999;
+
+        for (let wd of captchaData.words) {
+            const dist = Math.sqrt(Math.pow(clickXInImg - wd.x, 2) + Math.pow(clickYInImg - wd.y, 2));
+            if (dist < 40 && dist < minDist) {
+                minDist = dist;
+                hitWord = wd.word;
+            }
+        }
+
+        if (hitWord) {
+            userClicked.push(hitWord);
+            const mark = document.createElement('div');
+            mark.className = 'click-mark';
+            mark.style.left = x + 'px';
+            mark.style.top = y + 'px';
+            mark.innerText = userClicked.length;
+            box.appendChild(mark);
+        }
+    }
+
+    function submitLogin() {
+        const btn = document.querySelector('.btn');
+        btn.disabled = true;
+        btn.innerText = '登录中...';
+
+        // 【修改点2】登录接口改成 /api/my_login
+        axios.post('/api/my_login', {
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value,
+            clicked: userClicked
+        }).then(res => {
+            const data = res.data;
+            if (data.code === 1) {
+                document.getElementById('msg').style.color = '#2ed573';
+                document.getElementById('msg').innerText = '登录成功，正在跳转...';
+                setTimeout(() => {
+                    window.location.href = data.url || '/';
+                }, 500);
+            } else {
+                document.getElementById('msg').innerText = data.msg;
+                // 弹出提示框显示错误消息
+                alert(data.msg);
+                loadCaptcha();
+                btn.disabled = false;
+                btn.innerText = '安全登录';
+            }
+        }).catch(err => {
+            document.getElementById('msg').innerText = '服务器错误';
+            btn.disabled = false;
+            btn.innerText = '安全登录';
+        });
+    }
+</script>
+
+    <!-- 热更新功能 -->
+    <script>
+        (function() {
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                const ws = new WebSocket('ws://' + window.location.host + '/_ws');
+                ws.onmessage = function(event) {
+                    if (event.data === 'reload') {
+                        window.location.reload();
+                    }
+                };
+                ws.onerror = function() {
+                    // WebSocket连接失败，使用轮询作为备用方案
+                    let lastModified = new Date().getTime();
+                    setInterval(function() {
+                        fetch(window.location.href + '?_=' + Math.random(), {
+                            method: 'HEAD'
+                        }).then(function(response) {
+                            const currentModified = new Date(response.headers.get('Last-Modified')).getTime();
+                            if (currentModified > lastModified) {
+                                lastModified = currentModified;
+                                window.location.reload();
+                            }
+                        });
+                    }, 2000);
+                };
+            }
+        })();
+    </script>
+
+</body>
+</html>
