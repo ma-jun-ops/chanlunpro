@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <title>爱数学小女孩的缠论小院</title>
+
+    <link
+      rel="shortcut icon"
+      href="{{ url_for('static', filename='favicon.ico') }}" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/layui.css') }}" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/app.css') }}" />
+    <style>
+      :root {
+        --text: #0f172a;
+        --muted: #64748b;
+        --track: #e2e8f0;
+        --accent: #39d98a;
+        --danger: #ff4d4f;
+        --shadow: 0 10px 26px rgba(2, 6, 23, 0.1);
+      }
+
+      .card {
+        width: 100%;
+        background: transparent;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        padding: 12px 12px 10px;
+      }
+
+      .header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .title {
+        font-weight: 650;
+        letter-spacing: 0.2px;
+        font-size: 14px;
+      }
+
+      .value {
+        font-variant-numeric: tabular-nums;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .sub {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .gauge-wrap {
+        margin-top: 10px;
+        background: transparent;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 10px;
+        padding: 10px 10px 8px;
+      }
+
+      .gauge-wrap .sub {
+        margin-top: 8px;
+        text-align: right;
+      }
+
+      .gauge {
+        width: 100%;
+        height: 100px;
+        display: block;
+      }
+
+      .labels {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 4px;
+      }
+
+      .controls {
+        margin-top: 8px;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .pill {
+        background: transparent;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        padding: 6px 8px;
+        border-radius: 999px;
+        color: var(--text);
+        font-size: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        user-select: none;
+      }
+
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 0 4px rgba(57, 217, 138, 0.14);
+      }
+
+      .btn {
+        appearance: none;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(15, 23, 42, 0.04);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 10px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .btn:active {
+        transform: translateY(1px);
+      }
+    </style>
+
+    <script
+      type="text/javascript"
+      src="{{ url_for('static', filename='jquery-3.7.0.min.js') }}"></script>
+    <script
+      type="text/javascript"
+      src="{{ url_for('static', filename='layui.js') }}"></script>
+    <script
+      type="text/javascript"
+      src="{{ url_for('static', filename='xm-select.js') }}"></script>
+    <script
+      type="text/javascript"
+      src="{{ url_for('static', filename='marked.min.js') }}"></script>
+    <script
+      type="text/javascript"
+      src="{{ url_for('static', filename='charting_library/charting_library.standalone.js') }}?version=1.0.0"></script>
+    <script
+      type="text/javascript"
+      src="{{ url_for('static', filename='datafeeds/udf/dist/bundle.js') }}?version=1.0.0"></script>
+    {% include 'dark.html' %}
+  </head>
+
+  <body>
+    <div class="layui-fluid" style="padding: 0">
+      <div class="layui-row">
+        <div
+          class="layui-col-xs10 layui-col-sm10 layui-col-md10"
+          id="chart_container"
+          style="display: flex; flex-direction: column; height: 100vh">
+          {# 图表内容 #}
+          <div
+            id="tv_charts_area"
+            style="
+              width: 100%;
+              height: 100%;
+              display: flex;
+              flex-direction: column;
+            "></div>
+        </div>
+        <div
+          class="layui-col-xs2 layui-col-sm2 layui-col-md2"
+          id="chart_menu"
+          style="
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            overflow: scroll;
+            padding: 0;
+            margin: 0;
+          ">
+          <div style="padding: 10px">
+            <div class="layui-inline" style="width: 100%; display: flex; justify-content: space-between; align-items: center">
+              <h2 style="margin-top: 0">缠眼看盘</h2>
+              <button id="toggle-menu" class="layui-btn layui-btn-sm">
+                <i class="layui-icon layui-icon-more"></i>
+              </button>
+            </div>
+          </div>
+          <div class="layui-collapse lay-accordion" lay-filter="collapse-opts">
+            
+            <div class="layui-colla-item">
+              <div class="layui-colla-title" data-ca-title="关于">仓位提醒</div>
+              <div class="layui-colla-content" style="padding: 0">
+                <div id="position-reminder-content" class="layui-text" style="padding: 16px">
+                  <h6>最新仓位建议</h6>
+                  <h6>■ ■ ■ ■ ■ ■ 60% □ □ □ □</h6>
+                  <h6>关注短期技术性回调，特别是300个股！</h6>
+                  <h6>目前只有短期回调问题，不存在方向选择问题，大周期向上做多！</h6>
+                  <h6>科技、商业航天个股回踩后，日线顶分型dd点，10日线，都是机会！</h6>
+                  <h6>机会 >  风险  </h6>
+                </div>
+
+                <hr class="layui-border-red" />
+              </div>
+            </div>
+            
+
+            <div class="layui-colla-item">
+              <div class="layui-colla-title" data-ca-title="test">爱数学小女孩的缠论鱼池</div>
+              <div class="layui-colla-content" style="padding: 0">
+                <div class="layui-text" style="padding: 16px">
+                  
+                  <table class="layui-table" style="width: 100%">
+                    <thead>
+                      <tr>
+                        <th style="width: 40px;">标记</th>
+                        <th>股票代码</th>
+                        <th>股票名称</th>
+                        <th>涨幅比</th>
+                        <th>添加时间</th>
+                      </tr>
+                    </thead>
+                    <tbody id="fishpool-stock-list">
+                      <tr>
+                        <td colspan="5" style="text-align: center;">加载中...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            
+                        <div class="layui-colla-item">
+              <div class="layui-colla-title" data-ca-title="test">爱数学小女孩的缠论日记</div>
+              <div class="layui-colla-content" style="padding: 16px;">
+		      <!--<div class="layui-text" style="padding: 16px">-->
+                  
+                 <a href="http://www.chanlun-diary.com"><h5>我的日记</h5></a>
+		 <!--</div>-->
+              </div>
+            </div>
+            
+            <div class="layui-colla-item">
+              <div class="layui-colla-title">市场热度</div>
+              <div class="layui-colla-content" style="padding: 16px;">
+                <div class="card">
+                  <div class="header">
+                    <div>
+                      <div class="title">市场热度</div>
+                    </div>
+                    <div class="value"><span id="valueText">62</span>%</div>
+                  </div>
+
+                  <div class="gauge-wrap">
+                    <svg class="gauge" viewBox="0 0 200 125" aria-label="仪表盘">
+                      <defs>
+                        <linearGradient id="grad" x1="0" y1="0" x2="200" y2="0" gradientUnits="userSpaceOnUse">
+                          <stop offset="0" stop-color="#39d98a" />
+                          <stop offset="0.55" stop-color="#ffb020" />
+                          <stop offset="1" stop-color="#ff4d4f" />
+                        </linearGradient>
+                        <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+                          <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="rgba(0,0,0,0.35)" />
+                        </filter>
+                      </defs>
+
+                      <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="rgba(15,23,42,0.06)" stroke-width="20" />
+                      <path id="trackArc" d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="#e2e8f0" stroke-width="12" stroke-linecap="round" />
+                      <path id="valueArc" d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#grad)" stroke-width="12" stroke-linecap="round" filter="url(#softShadow)" />
+
+                      <g id="ticks" opacity="0.75">
+                        <g id="tickTemplate">
+                          <line x1="100" y1="25" x2="100" y2="34" stroke="rgba(231,237,247,0.55)" stroke-width="2" stroke-linecap="round" />
+                        </g>
+                      </g>
+
+                      <g id="needle" transform="translate(100 105) rotate(-45)">
+                        <polygon points="0,-62 6,0 -6,0" fill="#0f172a" filter="url(#softShadow)" />
+                        <circle r="8" fill="#0f172a" />
+                        <circle r="4" fill="#ffffff" opacity="0.95" />
+                      </g>
+                    </svg>
+
+                    <div class="labels">
+                      <span>0</span>
+                      <span>50</span>
+                      <span>100</span>
+                    </div>
+
+                    <div class="controls">
+                      <button id="refreshBtn" class="btn" type="button">立即刷新</button>
+                      <div class="pill"><span class="dot" id="statusDot"></span><span id="statusText">正常</span></div>
+                    </div>
+                    <div class="sub" id="updateText">等待更新…</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+
+
+          </div>
+        </div>
+      </div>
+    </div>
+    {% include 'sub_temp.html' %}
+  <script>
+    // 定时更新tick涨跌幅的对象
+    var interval_update_rates;
+    var interval_get_alert_records;
+
+    // 模板变量，在服务器端渲染时会被替换
+    var market_frequencys = {};
+
+    var default_vals = {
+      theme: "Light",
+      market: "a",
+      a_interval_1: "1D",
+      a_interval_2: "1D",
+      hk_interval_1: "1D",
+      hk_interval_2: "1D",
+      us_interval_1: "1D",
+      us_interval_2: "1D",
+      fx_interval_1: "1D",
+      fx_interval_2: "1D",
+      futures_interval_1: "1D",
+      futures_interval_2: "1D",
+      ny_futures_interval_1: "1D",
+      ny_futures_interval_2: "1D",
+      currency_interval_1: "1D",
+      currency_interval_2: "1D",
+      currency_spot_interval_1: "1D",
+      currency_spot_interval_2: "1D",
+      chart_layout_type: "single",
+      a_code: "{{ market_default_codes.a }}",
+      hk_code: "{{ market_default_codes.hk }}",
+      us_code: "{{ market_default_codes.us }}",
+      fx_code: "{{ market_default_codes.fx }}",
+      futures_code: "{{ market_default_codes.futures }}",
+      ny_futures_code: "{{ market_default_codes.ny_futures }}",
+      currency_code: "{{ market_default_codes.currency }}",
+      currency_spot_code: "{{ market_default_codes.currency_spot }}",
+    };
+    var chart_widgets = [];
+
+    // 变更图表展示的标的
+    function change_chart_ticker(_market, _code) {
+      var market = _market;
+      var code = _code;
+      Utils.set_local_data("market", market);
+      Utils.set_local_data(market + "_code", code);
+      layui.each(chart_widgets, function (i, w) {
+        w.activeChart().setSymbol(market + ":" + code);
+      });
+      ZiXuan.render_zixuan_opts();
+    }
+  </script>
+  <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_ama.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_atr.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_cdbb.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_cmcm.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_demo.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_fcx.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_hdly.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_heima.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_hlblw.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_hlftx.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_kdj.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_ltqs.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_ma.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_macdbl.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_vegasma.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_vol.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tv_indicators/chart_idx_rsx.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/zixuan.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/alert.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/ai.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/bkgn.js') }}"></script>
+  <script>
+    $(function () {
+      // 缠论配置项更改
+      layui.use(function () {
+        var layer = layui.layer;
+        var element = layui.element;
+        var form = layui.form;
+        var util = layui.util;
+        var dropdown = layui.dropdown;
+
+        /*// 下拉菜单事件
+        dropdown.render({
+          elem: "#toggle-menu",
+          data: [
+         
+            {
+              title: "切换主题",
+              templet:
+                '<div><i class="layui-icon layui-icon-engine"></i> <span>切换主题</span></div>',
+              id: 8,
+            }
+          ],
+          click: function (item) {
+            if (item.title === "缠论配置项") {
+              layer.open({
+                type: 2,
+                title: "缠论配置项变更",
+                area: ["1100px", "90vh"],
+                content:
+                  "/get_cl_config/" +
+                  Utils.get_market() +
+                  "/" +
+                  Utils.get_code().replace("/", "__"),
+                anim: 1,
+                fixed: true, // 不固定
+                shadeClose: true,
+              });
+            } else if (item.title === "切换主题") {
+              let theme = Utils.get_local_data("theme");
+              if (theme === "Light") {
+                Utils.set_local_data("theme", "dark");
+              } else {
+                Utils.set_local_data("theme", "Light");
+              }
+              location.reload();
+            }
+          },
+        });*/
+
+        // 自选操作初始
+        ZiXuan.init_zixuan_opts();
+
+        // 折叠面板事件
+        element.on("collapse(collapse-opts)", function (data) {
+          let is_open = data.show; // 得到当前面板的展开状态，true or false
+          let ca_title = $(data.title).attr("data-ca-title"); // 得到当前点击面板的标题区域对象
+
+          if (ca_title === "自选组") {
+            if (is_open) {
+              interval_update_rates = setInterval(
+                ZiXuan.stocks_update_rate(),
+                30000
+              );
+            } else {
+              clearInterval(interval_update_rates);
+            }
+          }
+          if (ca_title === "监控提醒") {
+            if (is_open) {
+              Alert.init();
+              // 获取警报记录
+              Alert.get_alert_records();
+              interval_get_alert_records = setInterval(
+                Alert.get_alert_records,
+                60000
+              );
+            } else {
+              clearInterval(interval_get_alert_records);
+            }
+          }
+
+          if (ca_title === "板块概念") {
+            if (is_open) {
+              // 板块概念
+              BKGN.init_bkgn_opts();
+            }
+          }
+
+          if (ca_title === "test") {
+            if (is_open) {
+              // 获取股票关注列表
+              get_stock_follows();
+            }
+          }
+        });
+
+        // 获取股票关注列表
+        function get_stock_follows() {
+          $.ajax({
+            url: "/get_stock_follows",
+            type: "GET",
+            dataType: "json",
+            success: function (data) {
+              let stockList = $("#stock-list");
+              stockList.empty();
+              
+              if (data.length === 0) {
+                stockList.append('<tr><td colspan="2" style="text-align: center;">暂无关注股票</td></tr>');
+              } else {
+                data.forEach(function (stock) {
+                  let tr = $('<tr style="cursor: pointer;"></tr>');
+                  tr.append('<td>' + stock.stock_code + '</td><td>' + stock.stock_name + '</td>');
+                  tr.click(function() {
+                    // 解析股票代码，提取市场和代码
+                    let stockCode = stock.stock_code;
+                    console.log('原始股票代码:', stockCode);
+                    
+                    let market, code;
+                    
+                    // 检查股票代码格式
+                    if (stockCode.includes('.')) {
+                      let parts = stockCode.split('.');
+                      let exchange = parts[0].toLowerCase();
+                      let codePart = parts[1];
+                      
+                      console.log('解析结果:', exchange, codePart);
+                      
+                      // 转换市场代码和调整代码格式
+                      switch(exchange) {
+                        case 'sh':
+                        case 'sz':
+                        case 'bj':
+                          market = 'a';
+                          // A股使用原始格式
+                          code = stockCode;
+                          break;
+                        case 'hk':
+                          market = 'hk';
+                          // 港股转换为KH前缀格式
+                          code = 'KH.' + codePart;
+                          break;
+                        case 'us':
+                          market = 'us';
+                          // 美股使用纯代码格式
+                          code = codePart;
+                          break;
+                        case 'fut':
+                          market = 'futures';
+                          // 期货使用原始格式
+                          code = stockCode;
+                          break;
+                        default:
+                          market = 'a';
+                          code = stockCode;
+                      }
+                    } else {
+                      // 直接使用代码，默认市场
+                      market = 'a';
+                      code = stockCode;
+                    }
+                    
+                    console.log('转换后:', market, code);
+                    
+                    // 切换到对应股票
+                    change_chart_ticker(market, code);
+                    
+                    // 测试K线数据获取
+                    testKlineData(market, code);
+                  });
+                  stockList.append(tr);
+                });
+              }
+            },
+            error: function (xhr, status, error) {
+              let stockList = $("#stock-list");
+              stockList.empty();
+              stockList.append('<tr><td colspan="2" style="text-align: center;">获取数据失败</td></tr>');
+              console.error("获取股票关注列表失败:", error);
+            }
+          });
+        }
+        
+        // 测试K线数据获取
+        function testKlineData(market, code) {
+          console.log('测试K线数据获取:', market, code);
+          
+          // 构建symbol参数
+          let symbol = market + ':' + code;
+          console.log('构建的symbol:', symbol);
+          
+          // 测试tv/history接口
+          let now = Math.floor(Date.now() / 1000);
+          let from = now - 30 * 24 * 60 * 60; // 30天前
+          let to = now;
+          
+          $.ajax({
+            url: "/tv/history",
+            type: "GET",
+            data: {
+              symbol: symbol,
+              from: from,
+              to: to,
+              resolution: "1D",
+              firstDataRequest: "true"
+            },
+            dataType: "json",
+            success: function (data) {
+              console.log('K线数据获取成功:', data);
+              if (data.s === 'ok') {
+                console.log('K线数据条数:', data.t.length);
+                console.log('最新K线时间:', new Date(data.t[data.t.length-1] * 1000));
+                console.log('最新K线收盘价:', data.c[data.c.length-1]);
+              } else {
+                console.log('K线数据获取失败:', data.s);
+              }
+            },
+            error: function (xhr, status, error) {
+              console.error('K线数据获取错误:', error);
+              console.error('响应状态:', xhr.status);
+              console.error('响应文本:', xhr.responseText);
+            }
+          });
+        }
+        
+        // 加载仓位提醒
+        function loadPositionReminder() {
+          $.ajax({
+            url: "/position-setting",
+            type: "GET",
+            dataType: "json",
+            success: function (data) {
+              let percentage = data.percentage || 60;
+              let reminderText = data.reminder_text || '';
+              
+              // 生成仓位圆点
+              let dotsHtml = '';
+              let activeDots = Math.round(percentage / 10);
+              for (let i = 0; i < 10; i++) {
+                if (i < activeDots) {
+                  dotsHtml += '■ ';
+                } else {
+                  dotsHtml += '□ ';
+                }
+              }
+              
+              // 更新仓位提醒内容
+              let positionContent = `
+                <h6>最新仓位建议</h6>
+                <h6>${dotsHtml}${percentage}%</h6>
+              `;
+              
+              // 如果有提醒文本，按行分割并添加
+              if (reminderText) {
+                let lines = reminderText.split('\n');
+                lines.forEach(function(line) {
+                  if (line.trim()) {
+                    positionContent += `<h6>${line.trim()}</h6>`;
+                  }
+                });
+              }
+              
+              $('#position-reminder-content').html(positionContent);
+            },
+            error: function (xhr, status, error) {
+              console.error("获取仓位提醒失败:", error);
+              // 失败时显示默认内容
+              $('#position-reminder-content').html(`
+                <h6>最新仓位建议</h6>
+                <h6>■ ■ ■ ■ ■ ■ 60% □ □ □ □</h6>
+                <h6>获取仓位提醒失败，请检查PythonProject1是否运行</h6>
+              `);
+            }
+          });
+        }
+
+        function loadFishPoolStocks() {
+          // 从localStorage获取星号标记
+          function getStarMarks() {
+            try {
+              const marks = localStorage.getItem('fishpool_star_marks');
+              return marks ? JSON.parse(marks) : {};
+            } catch (e) {
+              return {};
+            }
+          }
+          
+          // 保存星号标记到localStorage
+          function saveStarMarks(marks) {
+            try {
+              localStorage.setItem('fishpool_star_marks', JSON.stringify(marks));
+            } catch (e) {
+              console.error('保存星号标记失败:', e);
+            }
+          }
+          
+          // 切换星号标记
+          function toggleStar(stockCode, $starBtn) {
+            const marks = getStarMarks();
+            if (marks[stockCode]) {
+              delete marks[stockCode];
+              $starBtn.html('<span style="color: #ccc; font-size: 18px; cursor: pointer;">☆</span>');
+            } else {
+              marks[stockCode] = true;
+              $starBtn.html('<span style="color: #ff4d4f; font-size: 18px; cursor: pointer;">★</span>');
+            }
+            saveStarMarks(marks);
+          }
+          
+          $.ajax({
+            url: "/get_stock_follows",
+            type: "GET",
+            dataType: "json",
+            success: function (res) {
+              let stockList = res || [];
+              let marks = getStarMarks();
+              let html = '';
+              if (stockList.length === 0) {
+                html = '<tr><td colspan="5" style="text-align: center;">暂无关注股票</td></tr>';
+              } else {
+                stockList.forEach(function(stock) {
+                  const hasStar = marks[stock.stock_code] ? '★' : '☆';
+                  const starColor = marks[stock.stock_code] ? '#ff4d4f' : '#ccc';
+                  let followDate = '';
+                  let changeRateText = '-';
+                  let changeRateColor = '#999';
+                  if (stock.follow_time) {
+                    const d = new Date(stock.follow_time * 1000);
+                    followDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                  }
+                  if (stock.change_rate !== null && stock.change_rate !== undefined) {
+                    const changeRate = Number(stock.change_rate);
+                    changeRateText = changeRate.toFixed(2) + '%';
+                    if (changeRate > 0) {
+                      changeRateColor = '#ff4d4f';
+                    } else if (changeRate < 0) {
+                      changeRateColor = '#16baaa';
+                    } else {
+                      changeRateColor = '#666';
+                    }
+                  }
+                  html += '<tr class="fishpool-stock-row" data-code="' + stock.stock_code + '" style="cursor: pointer;">';
+                  html += '<td class="star-mark-cell" data-code="' + stock.stock_code + '"><span style="color: ' + starColor + '; font-size: 18px; cursor: pointer;">' + hasStar + '</span></td>';
+                  html += '<td>' + stock.stock_code + '</td>';
+                  html += '<td>' + stock.stock_name + '</td>';
+                  html += '<td style="color: ' + changeRateColor + ';">' + changeRateText + '</td>';
+                  html += '<td>' + followDate + '</td>';
+                  html += '</tr>';
+                });
+              }
+              $('#fishpool-stock-list').html(html);
+              
+              // 绑定行点击事件（切换股票）
+              $('.fishpool-stock-row').on('click', function(e) {
+                // 如果点击的是星号标记单元格，不切换股票
+                if ($(e.target).closest('.star-mark-cell').length > 0) {
+                  return;
+                }
+                let code = $(this).data('code');
+                change_chart_ticker('a', code);
+              });
+              
+              // 绑定星号标记点击事件
+              $('.star-mark-cell').on('click', function(e) {
+                e.stopPropagation();
+                let code = $(this).data('code');
+                toggleStar(code, $(this));
+              });
+            },
+            error: function (xhr, status, error) {
+              console.error("获取鱼池股票失败:", error);
+              $('#fishpool-stock-list').html('<tr><td colspan="5" style="text-align: center;">加载失败</td></tr>');
+            }
+          });
+        }
+
+        // 初始赋值
+        form.val("select_market_form", {
+          market: Utils.get_market(),
+        });
+        
+        // 加载仓位提醒
+        loadPositionReminder();
+        loadFishPoolStocks();
+        
+        // 表单变动
+        form.on("select(select_market)", function (data) {
+          var market = data.value;
+          Utils.set_local_data("market", market);
+          location.reload();
+        });
+
+        // 固定条，显示与隐藏菜单栏
+        Utils.render_fixbar();
+
+        // AI 分析助手
+        AI.init_ai_opts();
+        AI.get_ai_analyse_records();
+      });
+
+      // 初始化展示页面
+      function init_web() {
+        // 如果市场不是 a，则隐藏 collapse-bkgn
+        if (Utils.get_market() !== "a") {
+          $("#collapse-bkgn").hide();
+        }
+
+        let chart_layout_type =
+          Utils.get_local_data("chart_layout_type") || "single";
+        let charts_area = $("#tv_charts_area");
+        charts_area.empty();
+        let win_height = window.innerHeight;
+        let win_width = charts_area.width() || window.innerWidth;
+        let chart_configs = [];
+        if (chart_layout_type === "single") {
+          chart_configs = [{ id: "1", style: "flex:1;" }];
+          charts_area.css({ display: "flex", flexDirection: "column" });
+        } else if (chart_layout_type === "vertical-2") {
+          chart_configs = [
+            { id: "1", style: "flex:1;" },
+            { id: "2", style: "flex:1;" },
+          ];
+          charts_area.css({ display: "flex", flexDirection: "row" });
+        } else if (chart_layout_type === "horizontal-2") {
+          chart_configs = [
+            { id: "1", style: "flex:1;" },
+            { id: "2", style: "flex:1;" },
+          ];
+          charts_area.css({ display: "flex", flexDirection: "column" });
+        } else if (chart_layout_type === "three") {
+          chart_configs = [{ id: "1" }, { id: "2" }, { id: "3" }];
+          charts_area.css({ display: "flex", flexDirection: "column" });
+        } else if (chart_layout_type === "horizontal-7-3") {
+          chart_configs = [{ id: "1" }, { id: "2" }];
+          charts_area.css({ display: "flex", flexDirection: "column" });
+        } else if (chart_layout_type === "four") {
+          chart_configs = [
+            { id: "1", style: "width:50%;height:50%;float:left;" },
+            { id: "2", style: "width:50%;height:50%;float:left;" },
+            { id: "3", style: "width:50%;height:50%;float:left;" },
+            { id: "4", style: "width:50%;height:50%;float:left;" },
+          ];
+          charts_area.css({
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
+          });
+        }
+
+        chart_widgets = [];
+        if (chart_layout_type === "horizontal-7-3") {
+          charts_area.append(
+            '<div id="tv_chart_container_1" style="width:100%;height:' +
+              win_height * 0.7 +
+              'px;"></div>'
+          );
+          charts_area.append(
+            '<div id="tv_chart_container_2" style="width:100%;height:' +
+              win_height * 0.3 +
+              'px;"></div>'
+          );
+          chart_widgets.push(Charts.show_tv_chart("1", win_height * 0.7));
+          chart_widgets.push(Charts.show_tv_chart("2", win_height * 0.3));
+        } else if (chart_layout_type === "three") {
+          // 上面一行两个图
+          let rowDiv = $(
+            '<div style="display:flex;width:100%;height:' +
+              win_height / 2 +
+              'px;"></div>'
+          );
+          rowDiv.append(
+            '<div id="tv_chart_container_1" style="flex:1;"></div>'
+          );
+          rowDiv.append(
+            '<div id="tv_chart_container_2" style="flex:1;"></div>'
+          );
+          charts_area.append(rowDiv);
+          // 下面一行一个图
+          charts_area.append(
+            '<div id="tv_chart_container_3" style="width:100%;height:' +
+              win_height / 2 +
+              'px;"></div>'
+          );
+          chart_widgets.push(Charts.show_tv_chart("1", win_height / 2));
+          chart_widgets.push(Charts.show_tv_chart("2", win_height / 2));
+          chart_widgets.push(Charts.show_tv_chart("3", win_height / 2));
+        } else {
+          chart_configs.forEach(function (cfg, idx) {
+            let div_id = "tv_chart_container_" + cfg.id;
+            charts_area.append(
+              '<div id="' +
+                div_id +
+                '" style="' +
+                (cfg.style || "") +
+                '"></div>'
+            );
+            // 计算每个图表的高度/宽度
+            let chart_height =
+              chart_layout_type === "single"
+                ? win_height
+                : chart_layout_type === "vertical-2" ||
+                  chart_layout_type === "horizontal-2"
+                ? win_height / 2
+                : chart_layout_type === "four"
+                ? win_height / 2
+                : win_height;
+            chart_widgets.push(Charts.show_tv_chart(cfg.id, chart_height));
+          });
+        }
+        ZiXuan.render_zixuan_opts();
+      }
+
+      init_web();
+      interval_update_rates = setInterval(ZiXuan.stocks_update_rate(), 30000);
+    });
+  </script>
+
+<!--  &lt;!&ndash; 热更新功能 &ndash;&gt;-->
+<!--  <script>-->
+<!--    (function() {-->
+<!--      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {-->
+<!--        const ws = new WebSocket('ws://' + window.location.host + '/_ws');-->
+<!--        ws.onmessage = function(event) {-->
+<!--          if (event.data === 'reload') {-->
+<!--            window.location.reload();-->
+<!--          }-->
+<!--        };-->
+<!--        ws.onerror = function() {-->
+<!--          // WebSocket连接失败，使用轮询作为备用方案-->
+<!--          let lastModified = new Date().getTime();-->
+<!--          setInterval(function() {-->
+<!--            fetch(window.location.href + '?_=' + Math.random(), {-->
+<!--              method: 'HEAD'-->
+<!--            }).then(function(response) {-->
+<!--              const currentModified = new Date(response.headers.get('Last-Modified')).getTime();-->
+<!--              if (currentModified > lastModified) {-->
+<!--                lastModified = currentModified;-->
+<!--                window.location.reload();-->
+<!--              }-->
+<!--            });-->
+<!--          }, 2000);-->
+<!--        };-->
+<!--      }-->
+<!--    })();-->
+<!--  </script>-->
+  
+  <!-- 市场热度仪表脚本 -->
+  <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // 使用命名空间避免函数冲突
+        const MarketHeatGauge = {
+          init: function() {
+            this.valueText = document.getElementById("valueText");
+            this.valueArc = document.getElementById("valueArc");
+            this.needle = document.getElementById("needle");
+            this.ticks = document.getElementById("ticks");
+            this.statusDot = document.getElementById("statusDot");
+            this.statusText = document.getElementById("statusText");
+            this.updateText = document.getElementById("updateText");
+            this.refreshBtn = document.getElementById("refreshBtn");
+            this.nextRefreshAt = 0;
+            this.countdownTimer = 0;
+            this.refreshTimer = 0;
+            this.lastFetchAt = 0;
+            this.API_URL = 'http://flash-api.xuangubao.com.cn/api/market_indicator/line?fields=market_temperature';
+            
+            this.buildTicks();
+            this.setGauge(0); // 初始值设为0，与yibiaopan保持一致
+            this.bindEvents();
+            this.refreshFromApi("init");
+            this.scheduleNextRefresh();
+          },
+          
+          getLocalDateString: function() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${y}-${m}-${day}`;
+          },
+          
+          polarToCartesian: function(cx, cy, r, angleDeg) {
+            const a = (Math.PI / 180) * angleDeg;
+            return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+          },
+          
+          describeArc: function(cx, cy, r, startAngle, endAngle) {
+            const start = this.polarToCartesian(cx, cy, r, endAngle);
+            const end = this.polarToCartesian(cx, cy, r, startAngle);
+            const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+            return ["M", start.x, start.y, "A", r, r, 0, largeArcFlag, 0, end.x, end.y].join(" ");
+          },
+          
+          buildTicks: function() {
+            const count = 21;
+            for (let i = 0; i < count; i++) {
+              const t = i / (count - 1);
+              const angle = -180 + t * 180;
+              const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+              g.setAttribute("transform", `translate(100 105) rotate(${angle})`);
+              const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+              const major = i % 5 === 0;
+              line.setAttribute("x1", "0");
+              line.setAttribute("y1", major ? "-80" : "-80");
+              line.setAttribute("x2", "0");
+              line.setAttribute("y2", major ? "-70" : "-74");
+              line.setAttribute("stroke", major ? "rgba(15,23,42,0.55)" : "rgba(15,23,42,0.28)");
+              line.setAttribute("stroke-width", major ? "2.4" : "1.6");
+              line.setAttribute("stroke-linecap", "round");
+              g.appendChild(line);
+              this.ticks.appendChild(g);
+            }
+          },
+          
+          setStatus: function(v) {
+            let label = "正常";
+            let color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#39d98a";
+            if (v >= 85) {
+              label = "偏高";
+              color = getComputedStyle(document.documentElement).getPropertyValue("--danger").trim() || "#ff4d4f";
+            } else if (v >= 70) {
+              label = "注意";
+              color = "#ffb020";
+            }
+            this.statusText.textContent = label;
+            this.statusDot.style.background = color;
+            this.statusDot.style.boxShadow = `0 0 0 6px ${color}24`;
+          },
+          
+          setGauge: function(v) {
+            const value = Math.max(0, Math.min(100, Number(v) || 0));
+            this.valueText.textContent = String(Math.round(value));
+
+            const startAngle = -180;
+            const endAngle = -180 + (value / 100) * 180;
+            this.valueArc.setAttribute("d", this.describeArc(100, 105, 80, startAngle, endAngle));
+
+            const needleAngle = -90 + (value / 100) * 180;
+            this.needle.setAttribute("transform", `translate(100 105) rotate(${needleAngle})`);
+
+            this.setStatus(value);
+          },
+          
+          formatTime: function(tsSeconds) {
+            if (!Number.isFinite(tsSeconds)) return "";
+            const d = new Date(tsSeconds * 1000);
+            return d.toLocaleString("zh-CN", { hour12: false });
+          },
+          
+          formatClock: function(ms) {
+            const d = new Date(ms);
+            return d.toLocaleTimeString("zh-CN", { hour12: false });
+          },
+          
+          setUpdateText: function(extra) {
+            const now = Date.now();
+            const leftMs = Math.max(0, this.nextRefreshAt - now);
+            const leftSec = Math.ceil(leftMs / 1000);
+            const lastStr = this.lastFetchAt ? this.formatClock(this.lastFetchAt) : "--:--:--";
+            this.updateText.textContent = `上次请求：${lastStr}  下次刷新：${leftSec}s${extra ? "  " + extra : ""}`;
+          },
+          
+          startCountdown: function() {
+            if (this.countdownTimer) clearInterval(this.countdownTimer);
+            const self = this;
+            this.countdownTimer = setInterval(() => self.setUpdateText(""), 1000);
+          },
+          
+          scheduleNextRefresh: function() {
+            if (this.refreshTimer) clearTimeout(this.refreshTimer);
+            const now = new Date();
+            const next = new Date(now);
+            next.setSeconds(0, 0);
+            next.setMinutes(now.getMinutes() + 1);
+            this.nextRefreshAt = next.getTime();
+            this.setUpdateText("");
+            this.startCountdown();
+            const self = this;
+            this.refreshTimer = setTimeout(function() {
+              self.refreshFromApi("timer");
+              self.scheduleNextRefresh();
+            }, Math.max(0, this.nextRefreshAt - Date.now()));
+          },
+          
+          refreshFromApi: function(reason) {
+            const self = this;
+            try {
+              self.refreshBtn.disabled = true;
+              self.refreshBtn.textContent = "更新中…";
+              
+              // 使用实际的API接口获取数据，与yibiaopan保持一致
+              fetch(self.API_URL, {
+                method: 'GET',
+                cache: 'no-store',
+                signal: AbortSignal.timeout(8000)
+              })
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+              })
+              .then(data => {
+                // 解析API返回的数据格式
+                if (data && data.code === 20000 && Array.isArray(data.data) && data.data.length > 0) {
+                  // 获取最后一个数据点
+                  const lastData = data.data[data.data.length - 1];
+                  if (typeof lastData.market_temperature === 'number') {
+                    const value = lastData.market_temperature;
+                    const ts = Number(lastData.timestamp || Date.now() / 1000);
+                    self.lastFetchAt = Date.now();
+                    self.setGauge(value);
+                    self.setUpdateText(`数据时间：${self.formatTime(ts)}`);
+                  } else {
+                    throw new Error('Invalid data format');
+                  }
+                } else {
+                  throw new Error('Invalid data format');
+                }
+              })
+              .catch(error => {
+                console.error("市场热度数据获取失败:", error);
+                // 失败时显示错误状态，不使用模拟数据
+                self.statusText.textContent = "获取失败";
+                self.statusDot.style.background = "rgba(15,23,42,0.35)";
+                self.statusDot.style.boxShadow = "0 0 0 6px rgba(15,23,42,0.1)";
+                self.lastFetchAt = Date.now();
+                self.setUpdateText("数据获取失败");
+              })
+              .finally(() => {
+                self.refreshBtn.disabled = false;
+                self.refreshBtn.textContent = "立即刷新";
+              });
+            } catch (e) {
+              console.error("市场热度数据获取失败:", e);
+              // 异常时显示错误状态，不使用模拟数据
+              self.statusText.textContent = "获取失败";
+              self.statusDot.style.background = "rgba(15,23,42,0.35)";
+              self.statusDot.style.boxShadow = "0 0 0 6px rgba(15,23,42,0.1)";
+              self.lastFetchAt = Date.now();
+              self.setUpdateText("数据获取失败");
+              self.refreshBtn.disabled = false;
+              self.refreshBtn.textContent = "立即刷新";
+            }
+          },
+          
+          bindEvents: function() {
+            const self = this;
+            this.refreshBtn.addEventListener("click", function() {
+              self.refreshFromApi("manual");
+            });
+            window.addEventListener("focus", function() {
+              self.refreshFromApi("focus");
+            });
+            document.addEventListener("visibilitychange", function() {
+              if (!document.hidden) {
+                self.refreshFromApi("visible");
+              }
+            });
+          }
+        };
+        
+        // 初始化市场热度仪表
+        MarketHeatGauge.init();
+      });
+    </script>
+  </body>
+</html>

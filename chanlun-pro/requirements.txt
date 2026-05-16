@@ -1,0 +1,117 @@
+# 缠论项目依赖配置文件
+# 适用于Linux系统
+# 更新时间: 2026-04-25
+
+# 系统依赖 (需要在安装Python包之前安装):
+# Ubuntu/Debian: sudo apt-get install build-essential libssl-dev libffi-dev python3-dev libmysqlclient-dev
+# CentOS/RHEL: sudo yum install gcc gcc-c++ python3-devel mysql-devel
+
+
+# 数据处理
+pandas==2.1.0
+numpy==1.26.4
+scipy==1.17.1
+
+# 网络请求
+requests==2.33.1
+urllib3==2.6.3
+httpx==0.28.1
+
+# 数据库
+pymysql==1.1.2
+mysqlclient==2.2.8
+SQLAlchemy==2.0.48
+Flask-SQLAlchemy==3.1.1
+
+# 缓存
+redis==7.4.0
+
+# 工具库
+prettytable==3.17.0
+chardet==7.4.0.post2
+DBUtils==3.1.2
+APScheduler==3.11.2
+tenacity==9.1.4
+setuptools==69.0.3
+python-dotenv==1.0.0
+pytz==2026.1.post1
+tzlocal==5.3.1
+
+# Web框架
+Flask==3.1.3
+Flask-Login==0.6.3
+Flask-Compress==1.15
+Flask-MySQLdb==2.0.0
+Werkzeug==3.1.7
+Jinja2==3.1.6
+blinker==1.9.0
+itsdangerous==2.2.0
+MarkupSafe==3.0.3
+click==8.3.1
+
+# 网络
+gevent==25.9.1
+tornado==6.5.5
+greenlet==3.3.2
+zope.event==6.1
+zope.interface==8.2
+
+# 可视化
+pyecharts==2.0.8
+matplotlib==3.10.8
+pillow==12.1.1
+
+# 其他工具
+lark-oapi==1.5.3
+MyTT==2.9.3
+tqdm==4.67.3
+ipywidgets==8.1.8
+pinyin==0.4.0
+pyarmor==9.2.4
+pycryptodome==3.23.0
+psutil==7.2.2
+
+# 交易接口
+futu-api==10.2.6218
+ccxt==4.5.46
+baostock==0.8.9
+polygon-api-client==1.16.3
+alpaca-py==0.43.2
+ib-insync==0.9.86
+akshare==1.18.49
+tqsdk==3.9.1
+
+# AI相关
+openai==2.30.0
+playwright==1.58.0
+
+# 数据分析
+pyfolio-reloaded==0.9.9
+empyrical-reloaded==0.5.12
+dtaidistance==2.4.0
+scikit-learn==1.8.0
+seaborn==0.13.2
+
+
+# pytdx (通达信数据接口)
+pytdx
+
+# 其他依赖
+aiohttp==3.13.5
+beautifulsoup4==4.14.3
+lxml==6.0.2
+openpyxl==3.1.5
+xlrd==2.0.2
+simplejson==3.20.2
+tabulate==0.10.0
+packaging==26.0
+certifi==2025.11.12
+charset-normalizer==3.4.6
+idna==3.11
+cffi==2.0.0
+cryptography==46.0.6
+pydantic==2.12.5
+pydantic-core==2.41.5
+typing-extensions==4.15.0
+annotated-types==0.7.0
+typing-inspection==0.4.2

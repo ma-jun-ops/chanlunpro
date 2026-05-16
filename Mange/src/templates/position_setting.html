@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仓位设置</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="number"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+            line-height: 1.6;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0069d9;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            margin-left: 10px;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .preview {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        .preview h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .dots {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #666;
+            margin-right: 8px;
+        }
+        .dot.active {
+            background-color: #007bff;
+        }
+        .dot.inactive {
+            background-color: #ddd;
+        }
+        .percentage {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>仓位设置</h1>
+        
+        <!-- 提示消息 -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="message {{ category }}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        
+        <!-- 表单 -->
+        <form method="POST">
+            <div class="form-group">
+                <label for="percentage">仓位百分比：</label>
+                <input type="number" id="percentage" name="percentage" 
+                       value="{{ current_percentage }}" 
+                       min="0" max="100" required>
+            </div>
+            <div class="form-group">
+                <label for="reminder_text">仓位提醒文本：</label>
+                <textarea id="reminder_text" name="reminder_text" placeholder="请输入仓位提醒内容，将显示在 chanlun-pro 页面的仓位提醒区域">{{ current_reminder_text }}</textarea>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary">保存设置</button>
+                <a href="/" class="btn btn-secondary">返回首页</a>
+            </div>
+        </form>
+        
+        <!-- 预览 -->
+        <div class="preview">
+            <h2>现在仓位百分比</h2>
+            <div class="dots">
+                {% set total_dots = 10 %}
+                {% set active_dots = (current_percentage / 10) | int %}
+                {% for i in range(total_dots) %}
+                    {% if i < active_dots %}
+                        <div class="dot active"></div>
+                    {% else %}
+                        <div class="dot inactive"></div>
+                    {% endif %}
+                {% endfor %}
+                <span class="percentage">{{ current_percentage }}%</span>
+            </div>
+            <p>当前设置：{{ current_percentage }}% 仓位</p>
+            {% if current_reminder_text %}
+            <div style="margin-top: 20px; padding: 15px; background-color: #fff; border-radius: 4px; border: 1px solid #ddd;">
+                <h3 style="margin-bottom: 10px; color: #333;">仓位提醒预览：</h3>
+                {% for line in current_reminder_text.split('\n') %}
+                    {% if line.strip() %}
+                        <p style="margin: 5px 0; color: #555;">{{ line }}</p>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
