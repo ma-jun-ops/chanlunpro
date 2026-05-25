@@ -155,7 +155,7 @@
     <div class="layui-fluid" style="padding: 0">
       <div class="layui-row">
         <div
-          class="layui-col-xs10 layui-col-sm10 layui-col-md10"
+          class="layui-col-xs9 layui-col-sm9 layui-col-md9"
           id="chart_container"
           style="display: flex; flex-direction: column; height: 100vh">
           {# 图表内容 #}
@@ -169,7 +169,7 @@
             "></div>
         </div>
         <div
-          class="layui-col-xs2 layui-col-sm2 layui-col-md2"
+          class="layui-col-xs3 layui-col-sm3 layui-col-md3"
           id="chart_menu"
           style="
             position: fixed;
@@ -212,7 +212,7 @@
               <div class="layui-colla-content" style="padding: 0">
                 <div class="layui-text" style="padding: 16px">
                   
-                  <table class="layui-table" style="width: 100%">
+                  <table class="layui-table" style="width: 100%; white-space: nowrap;">
                     <thead>
                       <tr>
                         <th style="width: 40px;">标记</th>
@@ -220,6 +220,7 @@
                         <th>股票名称</th>
                         <th>涨幅比</th>
                         <th>添加时间</th>
+                        <th>板块</th>
                       </tr>
                     </thead>
                     <tbody id="fishpool-stock-list">
@@ -656,102 +657,81 @@
         }
 
         function loadFishPoolStocks() {
-          // 从localStorage获取星号标记
-          function getStarMarks() {
-            try {
-              const marks = localStorage.getItem('fishpool_star_marks');
-              return marks ? JSON.parse(marks) : {};
-            } catch (e) {
-              return {};
-            }
-          }
-          
-          // 保存星号标记到localStorage
-          function saveStarMarks(marks) {
-            try {
-              localStorage.setItem('fishpool_star_marks', JSON.stringify(marks));
-            } catch (e) {
-              console.error('保存星号标记失败:', e);
-            }
-          }
-          
-          // 切换星号标记
-          function toggleStar(stockCode, $starBtn) {
-            const marks = getStarMarks();
-            if (marks[stockCode]) {
-              delete marks[stockCode];
-              $starBtn.html('<span style="color: #ccc; font-size: 18px; cursor: pointer;">☆</span>');
-            } else {
-              marks[stockCode] = true;
-              $starBtn.html('<span style="color: #ff4d4f; font-size: 18px; cursor: pointer;">★</span>');
-            }
-            saveStarMarks(marks);
-          }
-          
           $.ajax({
             url: "/get_stock_follows",
             type: "GET",
             dataType: "json",
             success: function (res) {
               let stockList = res || [];
-              let marks = getStarMarks();
-              let html = '';
-              if (stockList.length === 0) {
-                html = '<tr><td colspan="5" style="text-align: center;">暂无关注股票</td></tr>';
-              } else {
-                stockList.forEach(function(stock) {
-                  const hasStar = marks[stock.stock_code] ? '★' : '☆';
-                  const starColor = marks[stock.stock_code] ? '#ff4d4f' : '#ccc';
-                  let followDate = '';
-                  let changeRateText = '-';
-                  let changeRateColor = '#999';
-                  if (stock.follow_time) {
-                    const d = new Date(stock.follow_time * 1000);
-                    followDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+              $.ajax({
+                url: "/get_star_marks",
+                type: "GET",
+                dataType: "json",
+                success: function(marksRes) {
+                  let marksData = {};
+                  if (marksRes.code === 0 && marksRes.data) {
+                    marksRes.data.forEach(function(code) { marksData[code] = true; });
                   }
-                  if (stock.change_rate !== null && stock.change_rate !== undefined) {
-                    const changeRate = Number(stock.change_rate);
-                    changeRateText = changeRate.toFixed(2) + '%';
-                    if (changeRate > 0) {
-                      changeRateColor = '#ff4d4f';
-                    } else if (changeRate < 0) {
-                      changeRateColor = '#16baaa';
-                    } else {
-                      changeRateColor = '#666';
-                    }
-                  }
-                  html += '<tr class="fishpool-stock-row" data-code="' + stock.stock_code + '" style="cursor: pointer;">';
-                  html += '<td class="star-mark-cell" data-code="' + stock.stock_code + '"><span style="color: ' + starColor + '; font-size: 18px; cursor: pointer;">' + hasStar + '</span></td>';
-                  html += '<td>' + stock.stock_code + '</td>';
-                  html += '<td>' + stock.stock_name + '</td>';
-                  html += '<td style="color: ' + changeRateColor + ';">' + changeRateText + '</td>';
-                  html += '<td>' + followDate + '</td>';
-                  html += '</tr>';
-                });
-              }
-              $('#fishpool-stock-list').html(html);
-              
-              // 绑定行点击事件（切换股票）
-              $('.fishpool-stock-row').on('click', function(e) {
-                // 如果点击的是星号标记单元格，不切换股票
-                if ($(e.target).closest('.star-mark-cell').length > 0) {
-                  return;
+                  renderFishPool(stockList, marksData);
+                },
+                error: function() {
+                  renderFishPool(stockList, {});
                 }
-                let code = $(this).data('code');
-                change_chart_ticker('a', code);
-              });
-              
-              // 绑定星号标记点击事件
-              $('.star-mark-cell').on('click', function(e) {
-                e.stopPropagation();
-                let code = $(this).data('code');
-                toggleStar(code, $(this));
               });
             },
             error: function (xhr, status, error) {
               console.error("获取鱼池股票失败:", error);
-              $('#fishpool-stock-list').html('<tr><td colspan="5" style="text-align: center;">加载失败</td></tr>');
+              $('#fishpool-stock-list').html('<tr><td colspan="6" style="text-align: center;">加载失败</td></tr>');
             }
+          });
+        }
+
+        function renderFishPool(stockList, marks) {
+          let html = '';
+          if (stockList.length === 0) {
+            html = '<tr><td colspan="6" style="text-align: center;">暂无关注股票</td></tr>';
+          } else {
+            stockList.forEach(function(stock) {
+              const hasStar = marks[stock.stock_code] ? '★' : '☆';
+              const starColor = marks[stock.stock_code] ? '#ff4d4f' : '#ccc';
+              let shortCode = stock.stock_code;
+              let dotIdx = shortCode.indexOf('.');
+              if (dotIdx >= 0) {
+                shortCode = shortCode.substring(dotIdx + 1);
+              }
+              let followDate = '';
+              let changeRateText = '-';
+              let changeRateColor = '#999';
+              if (stock.follow_time) {
+                const d = new Date(stock.follow_time * 1000);
+                followDate = String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+              }
+              if (stock.change_rate !== null && stock.change_rate !== undefined) {
+                const changeRate = Number(stock.change_rate);
+                changeRateText = changeRate.toFixed(2) + '%';
+                if (changeRate > 0) {
+                  changeRateColor = '#ff4d4f';
+                } else if (changeRate < 0) {
+                  changeRateColor = '#16baaa';
+                } else {
+                  changeRateColor = '#666';
+                }
+              }
+              html += '<tr class="fishpool-stock-row" data-code="' + stock.stock_code + '" style="cursor: pointer;">';
+              html += '<td><span style="color: ' + starColor + '; font-size: 18px;">' + hasStar + '</span></td>';
+              html += '<td>' + shortCode + '</td>';
+              html += '<td>' + stock.stock_name + '</td>';
+              html += '<td style="color: ' + changeRateColor + ';">' + changeRateText + '</td>';
+              html += '<td>' + followDate + '</td>';
+              html += '<td>' + (stock.sector || '') + '</td>';
+              html += '</tr>';
+            });
+          }
+          $('#fishpool-stock-list').html(html);
+
+          $('.fishpool-stock-row').on('click', function(e) {
+            let code = $(this).data('code');
+            change_chart_ticker('a', code);
           });
         }
 

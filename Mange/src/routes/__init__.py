@@ -24,7 +24,15 @@ import os
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, scoped_session, declarative_base
 from sqlalchemy.pool import QueuePool
-from db.database import get_stock_db_uri
+from db.database import get_stock_db_uri, get_db_connection
+import time
+
+from services.stock_api import get_stock_data_batch
+from services.stock_name import get_stock_name_by_code, get_stock_code_by_name
+from stock_change.calculator import get_change_data, calculate_all_changes
+from models import db, User, UserPlainPassword
+import random
+import string
 
 # ==================== 路由蓝图定义 ====================
 auth_bp = Blueprint('auth', __name__)      # 认证相关路由
@@ -55,6 +63,7 @@ class StockFollow(Base):
     stock_code = Column(String(20), nullable=False)
     stock_name = Column(String(100), nullable=False)
     follow_time = Column(Integer, nullable=False)
+    sector = Column(String(200), nullable=True, default='')
 
 
 # ==================== 仓位设置文件操作 ====================
@@ -171,7 +180,6 @@ def position_setting():
 
 @user_bp.route('/', methods=['GET', 'POST'])
 def index():
-    from models import db, User, UserPlainPassword
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
@@ -225,7 +233,6 @@ def index():
 
 @user_bp.route('/delete/<int:user_id>', methods=['POST'])
 def delete_user(user_id):
-    from models import db, User, UserPlainPassword
     try:
         user = User.query.get(user_id)
         if user:
@@ -246,7 +253,6 @@ def delete_user(user_id):
 
 @user_bp.route('/toggle-status/<int:user_id>', methods=['POST'])
 def toggle_user_status(user_id):
-    from models import db, User
     try:
         user = User.query.get(user_id)
         if user:
@@ -265,9 +271,6 @@ def toggle_user_status(user_id):
 
 @user_bp.route('/batch-create', methods=['GET', 'POST'])
 def batch_create_users():
-    from models import db, User, UserPlainPassword
-    import string
-    import random
     if request.method == 'POST':
         try:
             count = request.form.get('count', '').strip()
@@ -316,7 +319,6 @@ def batch_create_users():
 
 @user_bp.route('/export-users')
 def export_users():
-    from models import db, User, UserPlainPassword
     try:
         users = User.query.order_by(User.id.asc()).all()
         export_content = "用户ID,用户名,密码,激活状态,注册时间\n"
@@ -338,7 +340,6 @@ def export_users():
 
 @user_bp.route('/test-db')
 def test_db():
-    from models import db, User, UserPlainPassword
     try:
         user_count = User.query.count()
         plain_pwd_count = UserPlainPassword.query.count()
@@ -349,9 +350,6 @@ def test_db():
 
 @follow_bp.route('/follow', methods=['GET', 'POST'])
 def follow_page():
-    import time
-    from services.stock_api import get_stock_data_batch
-    from services.stock_name import get_stock_name_by_code, get_stock_code_by_name
     try:
         follows = stock_db.query(StockFollow).order_by(StockFollow.follow_time.desc()).all()
         stock_codes = [follow.stock_code for follow in follows]
@@ -439,11 +437,11 @@ def delete_stock_follow(follow_id):
             stock_code = follow.stock_code
             stock_db.delete(follow)
             stock_db.commit()
-            from db.database import get_db_connection
             conn = get_db_connection()
             try:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM stock_change WHERE stock_code = %s", (stock_code,))
+                cursor.execute("DELETE FROM star_marks WHERE stock_code = %s", (stock_code,))
                 conn.commit()
             finally:
                 conn.close()
@@ -462,16 +460,17 @@ def clear_stock_follows():
     try:
         delete_num = stock_db.query(StockFollow).delete()
         stock_db.commit()
-        from db.database import get_db_connection
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM stock_change")
             change_num = conn.rowcount
+            cursor.execute("DELETE FROM star_marks")
+            star_num = conn.rowcount
             conn.commit()
         finally:
             conn.close()
-        flash(f'清空成功！共删除 {delete_num} 条关注记录，{change_num} 条涨跌幅记录', 'success')
+        flash(f'清空成功！共删除 {delete_num} 条关注记录，{change_num} 条涨跌幅记录，{star_num} 条标记记录', 'success')
     except Exception as e:
         stock_db.rollback()
         print(f"[ERROR] 清空失败：{e}")
@@ -486,7 +485,6 @@ def change_page():
 
 @change_bp.route('/api/stock_change')
 def api_stock_change():
-    from stock_change.calculator import get_change_data
     try:
         data = get_change_data()
         return jsonify({'code': 0, 'msg': 'success', 'data': data})
@@ -496,9 +494,69 @@ def api_stock_change():
 
 @change_bp.route('/api/stock_change/calculate', methods=['POST'])
 def api_stock_change_calculate():
-    from stock_change.calculator import calculate_all_changes
     try:
         calculate_all_changes()
         return jsonify({'code': 0, 'msg': '计算完成'})
     except Exception as e:
         return jsonify({'code': -1, 'msg': str(e)})
+
+
+@follow_bp.route('/api/star_marks')
+def api_get_star_marks():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT stock_code FROM star_marks")
+        rows = cursor.fetchall()
+        marks = [r['stock_code'] for r in rows]
+        return jsonify({'code': 0, 'data': marks})
+    except Exception as e:
+        return jsonify({'code': -1, 'msg': str(e), 'data': []})
+    finally:
+        conn.close()
+
+
+@follow_bp.route('/api/sector/update', methods=['POST'])
+def api_update_sector():
+    data = request.get_json()
+    stock_code = data.get('stock_code', '').strip()
+    sector = data.get('sector', '').strip()
+    if not stock_code:
+        return jsonify({'code': -1, 'msg': '缺少股票代码'})
+    try:
+        follow = stock_db.query(StockFollow).filter_by(stock_code=stock_code).first()
+        if follow:
+            follow.sector = sector
+            stock_db.commit()
+            return jsonify({'code': 0, 'msg': '更新成功'})
+        else:
+            return jsonify({'code': -1, 'msg': '股票不存在'})
+    except Exception as e:
+        stock_db.rollback()
+        return jsonify({'code': -1, 'msg': str(e)})
+
+
+@follow_bp.route('/api/star_marks/toggle', methods=['POST'])
+def api_toggle_star_mark():
+    data = request.get_json()
+    stock_code = data.get('stock_code', '').strip()
+    if not stock_code:
+        return jsonify({'code': -1, 'msg': '缺少股票代码'})
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM star_marks WHERE stock_code = %s", (stock_code,))
+        existing = cursor.fetchone()
+        if existing:
+            cursor.execute("DELETE FROM star_marks WHERE stock_code = %s", (stock_code,))
+            conn.commit()
+            return jsonify({'code': 0, 'marked': False, 'msg': '已取消标记'})
+        else:
+            cursor.execute("INSERT INTO star_marks (stock_code, marked_at) VALUES (%s, %s)", (stock_code, int(time.time())))
+            conn.commit()
+            return jsonify({'code': 0, 'marked': True, 'msg': '已标记'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'code': -1, 'msg': str(e)})
+    finally:
+        conn.close()

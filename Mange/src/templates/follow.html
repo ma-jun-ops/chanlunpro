@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>关注页面</title>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -177,22 +178,28 @@
                 <!-- 关注列表 -->
                 <table>
                     <tr>
+                        <th style="width:50px;">标记</th>
                         <th>ID</th>
                         <th>股票代码</th>
                         <th>股票名称</th>
                         <th>当前价格</th>
                         <th>涨跌幅</th>
                         <th>关注时间</th>
+                        <th>板块</th>
                         <th>操作</th>
                     </tr>
                     {% for follow in follows %}
                     <tr>
+                        <td class="star-cell" data-code="{{ follow.stock_code }}" style="text-align:center;cursor:pointer;">
+                            <span class="star-icon" style="font-size:18px;color:#ccc;">☆</span>
+                        </td>
                         <td>{{ follow.id }}</td>
                         <td>{{ follow.stock_code }}</td>
                         <td>{{ follow.stock_name }}</td>
                         <td>{{ follow.price }}</td>
                         <td>{{ follow.change_percent }}%</td>
                         <td>{{ follow.follow_time | timestamp_to_datetime }}</td>
+                        <td><input type="text" class="sector-input" data-code="{{ follow.stock_code }}" value="{{ follow.sector or '' }}" placeholder="手输板块" style="width:100px;"></td>
                         <td>
                             <form method="POST" action="/follow/delete/{{ follow.id }}" style="display: inline;">
                                 <button type="submit" class="btn btn-danger" onclick="return confirm('确定要删除这条记录吗？');">删除</button>
@@ -201,7 +208,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" style="text-align: center;">暂无关注数据</td>
+                        <td colspan="9" style="text-align: center;">暂无关注数据</td>
                     </tr>
                     {% endfor %}
                 </table>
@@ -228,6 +235,68 @@
     </div>
     
     <script>
+        function loadStarMarks() {
+            $.ajax({
+                url: '/api/star_marks',
+                type: 'GET',
+                dataType: 'json',
+                success: function(res) {
+                    if (res.code === 0 && res.data) {
+                        res.data.forEach(function(code) {
+                            var $cell = $('.star-cell[data-code="' + code + '"]');
+                            if ($cell.length) {
+                                $cell.find('.star-icon').css('color', '#ff4d4f').text('★');
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        $(function() {
+            loadStarMarks();
+
+            $('.star-cell').on('click', function(e) {
+                e.preventDefault();
+                var $cell = $(this);
+                var stockCode = $cell.data('code');
+                $.ajax({
+                    url: '/api/star_marks/toggle',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ stock_code: stockCode }),
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.code === 0) {
+                            if (res.marked) {
+                                $cell.find('.star-icon').css('color', '#ff4d4f').text('★');
+                            } else {
+                                $cell.find('.star-icon').css('color', '#ccc').text('☆');
+                            }
+                        }
+                    }
+                });
+            });
+
+            $('.sector-input').on('blur', function() {
+                var $input = $(this);
+                var stockCode = $input.data('code');
+                var sector = $input.val().trim();
+                $.ajax({
+                    url: '/api/sector/update',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ stock_code: stockCode, sector: sector }),
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.code !== 0) {
+                            console.error('板块更新失败:', res.msg);
+                        }
+                    }
+                });
+            });
+        });
+    </script>
         // 热更新功能
         (function() {
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {

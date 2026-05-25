@@ -1902,6 +1902,7 @@ def create_app(test_config=None):
                     sf.stock_code,
                     sf.stock_name,
                     sf.follow_time,
+                    sf.sector,
                     sc.change_rate
                 FROM stock_follows sf
                 LEFT JOIN stock_change sc
@@ -1923,5 +1924,27 @@ def create_app(test_config=None):
         except Exception as e:
             print(f"获取股票关注列表失败: {e}")
             return json.dumps([])
+
+    @app.route("/get_star_marks")
+    def get_star_marks():
+        try:
+            conn = pymysql.connect(
+                host='localhost',
+                port=3306,
+                user='root',
+                password='123456',
+                database='stokedb',
+                charset='utf8mb4'
+            )
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            cursor.execute("SELECT stock_code FROM star_marks")
+            rows = cursor.fetchall()
+            marks = [r['stock_code'] for r in rows]
+            cursor.close()
+            conn.close()
+            return jsonify({'code': 0, 'data': marks})
+        except Exception as e:
+            print(f"获取星星标记失败: {e}")
+            return jsonify({'code': -1, 'data': []})
 
     return app

@@ -28,13 +28,13 @@ import webbrowser
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # 导入数据库配置
-from db.database import get_user_db_uri, create_stock_db
+from db.database import get_user_db_uri, create_stock_db, get_db_connection
 # 导入数据模型
 from models import db
 # 导入路由蓝图
-from routes import auth_bp, user_bp, follow_bp, position_bp, change_bp
+from routes import auth_bp, user_bp, follow_bp, position_bp, change_bp, stock_engine, StockFollow
 # 导入涨跌幅计算模块
-from stock_change.calculator import create_change_table
+from stock_change.calculator import create_change_table, create_star_marks_table
 from stock_change.scheduler import start_scheduler
 
 # 创建Flask应用实例
@@ -88,9 +88,18 @@ if __name__ == '__main__':
     # 第二步：初始化股票数据库
     try:
         create_stock_db()
-        from routes import stock_engine, StockFollow
         StockFollow.__table__.create(stock_engine, checkfirst=True)
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("ALTER TABLE stock_follows ADD COLUMN sector VARCHAR(200) DEFAULT ''")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        finally:
+            conn.close()
         create_change_table()
+        create_star_marks_table()
     except Exception as e:
         print(f"[WARNING] 股票数据库初始化失败：{e}")
 

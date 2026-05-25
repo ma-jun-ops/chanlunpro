@@ -302,7 +302,7 @@ if __name__ == "__main__":
         
         # 固定端口号配置（12001-12004）
         # 可以通过环境变量 CHANLUN_PORT 设置，默认为12001
-        bind_port = int(os.environ.get('CHANLUN_PORT', 12000))
+        bind_port = int(os.environ.get('CHANLUN_PORT', 12001))
 
         
         # CPU绑定功能（使用psutil）
@@ -344,7 +344,7 @@ if __name__ == "__main__":
 
         # 默认打开本机地址
         if len(sys.argv) < 2 or sys.argv[1] != "nobrowser":
-            if bind_port ==12000:
+            if bind_port ==12001:
                 webbrowser.open(f"http://127.0.0.1:{bind_port}/my_login_page")
 
         IOLoop.instance().start()

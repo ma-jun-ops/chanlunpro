@@ -156,6 +156,26 @@ def create_change_table():
         conn.close()
 
 
+def create_star_marks_table():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS star_marks (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                stock_code VARCHAR(20) NOT NULL,
+                marked_at INT NOT NULL COMMENT '标记时间戳',
+                UNIQUE KEY uk_code (stock_code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+        """)
+        conn.commit()
+        print("[OK] star_marks 表创建成功")
+    except Exception as e:
+        print(f"[ERROR] 创建star_marks表失败: {e}")
+    finally:
+        conn.close()
+
+
 def get_follow_stocks():
     """
     获取所有关注的股票列表
@@ -315,8 +335,20 @@ def calculate_all_changes():
             WHERE stock_code COLLATE utf8mb4_unicode_ci NOT IN (SELECT stock_code FROM stock_follows)
         """)
         orphan_count = cursor.rowcount
-        if orphan_count > 0:
-            print(f"[INFO] 清理 {orphan_count} 条已取消关注的涨跌幅记录")
+
+        cursor.execute("""
+            DELETE FROM star_marks
+            WHERE stock_code COLLATE utf8mb4_unicode_ci NOT IN (SELECT stock_code FROM stock_follows)
+        """)
+        star_orphan = cursor.rowcount
+
+        if orphan_count > 0 or star_orphan > 0:
+            parts = []
+            if orphan_count > 0:
+                parts.append(f"{orphan_count} 条涨跌幅")
+            if star_orphan > 0:
+                parts.append(f"{star_orphan} 条标记")
+            print(f"[INFO] 清理已取消关注记录: {', '.join(parts)}")
             conn.commit()
 
         success_count = 0

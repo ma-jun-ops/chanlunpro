@@ -82,7 +82,7 @@ var Utils = (function () {
                   .addClass("layui-icon-shrink-right");
                 $("#chart_menu").hide();
                 $("#chart_container")
-                  .removeClass("layui-col-xs10 layui-col-sm10 layui-col-md10")
+                  .removeClass("layui-col-xs9 layui-col-sm9 layui-col-md9")
                   .addClass("layui-col-xs12 layui-col-sm12 layui-col-md12");
               } else {
                 fixed_li
@@ -91,7 +91,7 @@ var Utils = (function () {
                 $("#chart_menu").show();
                 $("#chart_container")
                   .removeClass("layui-col-xs12 layui-col-sm12 layui-col-md12")
-                  .addClass("layui-col-xs10 layui-col-sm10 layui-col-md10");
+                  .addClass("layui-col-xs9 layui-col-sm9 layui-col-md9");
               }
             }
           },
