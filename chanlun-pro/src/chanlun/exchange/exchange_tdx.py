@@ -131,6 +131,10 @@ class ExchangeTDX(Exchange):
             print("连接失败，重新选择最优服务器")
             self.reset_tdx_ip()
             return self.all_stocks()
+        except Exception as e:
+            print(f"获取股票列表异常: {e}，返回空列表")
+            self.g_all_stocks = __all_stocks
+            return __all_stocks
 
         # 添加北京A股的股票
         for _c, _n in tdx_codes_by_bj.items():
@@ -171,12 +175,32 @@ class ExchangeTDX(Exchange):
         else:
             market = None
 
+        # 使用原始的 for_sh/for_sz 分类规则，避免调用 all_stocks() 导致的 GBK 解码问题
         if market == 2:
             _type = "stock_cn"
         else:
-            all_stocks = self.all_stocks()
-            stock = [_s for _s in all_stocks if _s["code"] == code]
-            _type = stock[0]["type"] if stock else None
+            # 根据代码前缀判断类型
+            code_num = code[-6:]
+            if market == 1:  # 上海
+                if code_num[0] == '6':
+                    _type = "stock_cn"
+                elif code_num[:3] in ['000', '880', '999']:
+                    _type = "index_cn"
+                elif code_num[:2] in ['51', '58']:
+                    _type = "etf_cn"
+                else:
+                    _type = "stock_cn"
+            elif market == 0:  # 深圳
+                if code_num[:2] in ['00', '30', '02']:
+                    _type = "stock_cn"
+                elif code_num[:2] in ['39']:
+                    _type = "index_cn"
+                elif code_num[:2] in ['15', '16']:
+                    _type = "etf_cn"
+                else:
+                    _type = "stock_cn"
+            else:
+                _type = "stock_cn"
         return market, code[-6:], _type
 
     @retry(
@@ -214,7 +238,11 @@ class ExchangeTDX(Exchange):
             try:
                 # 反序列化缓存数据
                 ks = pd.DataFrame(cached_data)
-                ks['date'] = pd.to_datetime(ks['date']).dt.tz_localize(self.tz)
+                ks['date'] = pd.to_datetime(ks['date'])
+                if ks['date'].dt.tz is None:
+                    ks['date'] = ks['date'].dt.tz_localize(self.tz)
+                else:
+                    ks['date'] = ks['date'].dt.tz_convert(self.tz)
                 return ks
             except Exception as e:
                 print(f"缓存数据解析失败: {e}")
@@ -240,6 +268,17 @@ class ExchangeTDX(Exchange):
         market, tdx_code, _type = self.to_tdx_code(code)
         if market is None or _type is None:
             return None
+
+        # 定义安全的日期解析函数（在 try 块外部定义，确保作用域正确）
+        def safe_parse_datetime(dt_str):
+            try:
+                dt = pd.to_datetime(dt_str)
+                # 移除时区信息，避免时区比较问题
+                if dt.tzinfo is not None:
+                    dt = dt.tz_localize(None)
+                return dt
+            except:
+                return pd.NaT
 
         try:
             client = TdxHq_API(raise_exception=True, auto_retry=True)
@@ -272,7 +311,9 @@ class ExchangeTDX(Exchange):
                     )
                     if len(ks) == 0:
                         return pd.DataFrame([])
-                    ks.loc[:, "date"] = pd.to_datetime(ks["datetime"])
+                    ks.loc[:, "date"] = ks["datetime"].apply(safe_parse_datetime)
+                    # 删除无效日期的行
+                    ks = ks.dropna(subset=['date'])
                     ks.sort_values("date", inplace=True)
                 else:
                     for i in range(1, args["pages"] + 1):
@@ -288,7 +329,11 @@ class ExchangeTDX(Exchange):
                         )
                         if len(_ks) == 0:
                             break
-                        _ks.loc[:, "date"] = pd.to_datetime(_ks["datetime"])
+                        # 修复日期解析问题
+                        _ks.loc[:, "date"] = _ks["datetime"].apply(safe_parse_datetime)
+                        _ks = _ks.dropna(subset=['date'])
+                        if len(_ks) == 0:
+                            break
                         _ks.sort_values("date", inplace=True)
                         new_start_dt = _ks.iloc[0]["date"]
                         old_end_dt = ks.iloc[-1]["date"]
@@ -314,8 +359,12 @@ class ExchangeTDX(Exchange):
             ks.loc[:, "code"] = code
             ks.loc[:, "volume"] = ks["vol"]
 
-            # 转换时区
-            ks["date"] = ks["date"].dt.tz_localize(self.tz)
+            # 转换时区（处理异常日期）
+            try:
+                ks["date"] = ks["date"].dt.tz_localize(self.tz)
+            except:
+                # 如果时区转换失败，跳过时区转换
+                pass
             if frequency in ["d", "w", "m", "q", "y"]:
                 # 将时间转换成 15:00:00
                 ks["date"] = ks["date"].apply(lambda _d: _d.replace(hour=15, minute=0))
@@ -377,9 +426,20 @@ class ExchangeTDX(Exchange):
         """
         all_stock = self.all_stocks()
         stock = [_s for _s in all_stock if _s["code"] == code]
-        if not stock:
-            return None
-        return stock[0]
+        if stock:
+            return stock[0]
+        # all_stocks 失败时的回退方案：根据代码格式返回基本信息
+        code_num = code[-6:]
+        if code_num.startswith('6'):
+            return {"code": code, "name": code, "type": "stock_cn", "precision": 100}
+        elif code_num.startswith('0') or code_num.startswith('3'):
+            return {"code": code, "name": code, "type": "stock_cn", "precision": 100}
+        elif code_num.startswith('5') or code_num.startswith('1'):
+            return {"code": code, "name": code, "type": "index", "precision": 1000}
+        elif code_num.startswith('4') or code_num.startswith('8'):
+            return {"code": code, "name": code, "type": "stock_cn", "precision": 100}
+        else:
+            return {"code": code, "name": code, "type": "stock_cn", "precision": 100}
 
 
     def ticks(self, codes: List[str]) -> Dict[str, Tick]:

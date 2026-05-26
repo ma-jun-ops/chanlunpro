@@ -136,6 +136,12 @@ if __name__ == "__main__":
         def global_login_check():
             path = request.path
 
+            # 如果未配置登录密码，直接放行所有请求（flask_login 会处理自动登录）
+            if config.LOGIN_PWD == "":
+                if 'logged_in' not in session:
+                    session['logged_in'] = True
+                return None
+
             special_white_list = [
                 '/my_login_page',
                 '/api/my_captcha',

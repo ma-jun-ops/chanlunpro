@@ -300,7 +300,8 @@ def create_app(test_config=None):
             login_user(
                 LoginUser(), remember=True, duration=datetime.timedelta(hours=2)
             )
-            return redirect("/")
+            next_url = request.args.get("next", "/")
+            return redirect(next_url)
 
         emsg = ""
         if request.method == "POST":
@@ -309,7 +310,8 @@ def create_app(test_config=None):
                 login_user(
                     LoginUser(), remember=True, duration=datetime.timedelta(hours=2)
                 )
-                return redirect("/")
+                next_url = request.args.get("next", "/")
+                return redirect(next_url)
             else:
                 emsg = "密码错误"
 
@@ -669,13 +671,16 @@ def create_app(test_config=None):
         )
 
 
-        # 从 Redis 缓存中读取数据
+        # ==========================================
+        # Phase 1: 获取K线数据
+        # ==========================================
+        _calc_freq = frequency
         if (
             cl_config["enable_kchart_low_to_high"] == "1"
             and kchart_to_frequency is not None
         ):
             _log("使用低级别数据模式")
-            # 如果开启并设置的该级别的低级别数据，获取低级别数据，并在转换成高级图表展示
+            _calc_freq = frequency_low
             cache_key = f"klines:{market}:{code}:{frequency_low}"
             klines = cache.get(cache_key)
             _log(f"缓存读取: {'命中' if klines else '未命中'}")
@@ -689,8 +694,6 @@ def create_app(test_config=None):
                 if klines is None:
                     return {"s": "no_data", "nextTime": int(time.time() + 60)}
                 _log(f"获取K线数据完成: {len(klines)}条")
-                # 缓存数据，设置过期时间为 5 分钟
-                # 转换 Timestamp 为字符串以支持 JSON 序列化
                 klines_dict = klines.to_dict('records')
                 for item in klines_dict:
                     if 'date' in item and hasattr(item['date'], 'isoformat'):
@@ -698,7 +701,6 @@ def create_app(test_config=None):
                 cache.set(cache_key, klines_dict, expire=300)
                 _log("缓存写入完成")
             else:
-                # 将字符串日期转换回 Timestamp 类型
                 for item in klines:
                     if 'date' in item and isinstance(item['date'], str):
                         try:
@@ -706,14 +708,8 @@ def create_app(test_config=None):
                         except Exception:
                             pass
                 klines = pd.DataFrame(klines)
-                # 确保 date 列是 Timestamp 类型
                 if 'date' in klines.columns:
                     klines['date'] = pd.to_datetime(klines['date'])
-            _log("开始计算缠论数据")
-            cd = web_batch_get_cl_datas(
-                market, code, {frequency_low: klines}, cl_config
-            )[0]
-            _log("缠论数据计算完成")
         else:
             _log("直接获取K线数据模式")
             kchart_to_frequency = None
@@ -730,8 +726,6 @@ def create_app(test_config=None):
                 if klines is None:
                     return {"s": "no_data", "nextTime": int(time.time() + 60)}
                 _log(f"获取K线数据完成: {len(klines)}条")
-                # 缓存数据，设置过期时间为 5 分钟
-                # 转换 Timestamp 为字符串以支持 JSON 序列化
                 klines_dict = klines.to_dict('records')
                 for item in klines_dict:
                     if 'date' in item and hasattr(item['date'], 'isoformat'):
@@ -739,7 +733,6 @@ def create_app(test_config=None):
                 cache.set(cache_key, klines_dict, expire=300)
                 _log("缓存写入完成")
             else:
-                # 将字符串日期转换回 Timestamp 类型
                 for item in klines:
                     if 'date' in item and isinstance(item['date'], str):
                         try:
@@ -747,23 +740,40 @@ def create_app(test_config=None):
                         except Exception:
                             pass
                 klines = pd.DataFrame(klines)
-                # 确保 date 列是 Timestamp 类型
                 if 'date' in klines.columns:
                     klines['date'] = pd.to_datetime(klines['date'])
-            _log("开始计算缠论数据")
-            cd = web_batch_get_cl_datas(market, code, {frequency: klines}, cl_config)[0]
-            _log("缠论数据计算完成")
 
         # 如果图表指定返回的时间太早，直接返回无数据
         if int(_to) < fun.datetime_to_int(klines.iloc[0]["date"]):
             return {"s": "no_data"}
 
-        # 将缠论数据，转换成 tv 画图的坐标数据
-        _log("开始转换缠论数据为TV格式")
-        cl_chart_data = cl_data_to_tv_chart(
-            cd, cl_config, to_frequency=kchart_to_frequency
-        )
-        _log("数据转换完成")
+        # ==========================================
+        # Phase 2: Redis 缓存（跳过缠论计算+TV转换）
+        # ==========================================
+        _klines_last_date = str(klines.iloc[-1]["date"])
+        _tv_chart_cache_key = f"tv_cl_result:{market}:{code}:{_calc_freq}"
+        _cached_tv_data = cache.get(_tv_chart_cache_key)
+        cl_chart_data = None
+        if _cached_tv_data is not None and isinstance(_cached_tv_data, dict):
+            if _cached_tv_data.get("_last_date") == _klines_last_date:
+                cl_chart_data = _cached_tv_data
+                cl_chart_data.pop("_last_date", None)
+
+        if cl_chart_data is None:
+            _log("开始计算缠论数据")
+            cd = web_batch_get_cl_datas(
+                market, code, {_calc_freq: klines}, cl_config
+            )[0]
+            _log("缠论数据计算完成")
+            _log("开始转换缠论数据为TV格式")
+            cl_chart_data = cl_data_to_tv_chart(
+                cd, cl_config, to_frequency=kchart_to_frequency
+            )
+            _log("数据转换完成")
+            _cache_data = dict(cl_chart_data)
+            _cache_data["_last_date"] = _klines_last_date
+            cache.set(_tv_chart_cache_key, _cache_data, expire=600)
+
         __log.info(f'{code} - {frequency} to tv chart data time : {time.time() - _func_start}')
 
         # 根据 from_time 和 to_time 来获取对应的K线数据

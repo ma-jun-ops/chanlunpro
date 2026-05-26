@@ -1,3 +1,4 @@
+import os
 import pathlib
 
 """
@@ -168,6 +169,12 @@ FEISHU_KEYS = {
 }
 
 def get_data_path():
+    """获取数据路径，优先使用本地可写目录"""
+    local_path = r"/home/cl/桌面/final22222/.chanlun_pro_local"
+    if os.path.exists(local_path) and os.access(local_path, os.W_OK):
+        return pathlib.Path(local_path)
+    # 回退到默认路径
+
     # 获取项目数据的目录
     data_path = pathlib.Path(DATA_PATH)
     if DATA_PATH.startswith("."):
