@@ -35,6 +35,7 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)  # 存储哈希后的密码
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+    expire_date = db.Column(db.DateTime, nullable=True)
 
     def __repr__(self):
         return f'<User {self.username}>'

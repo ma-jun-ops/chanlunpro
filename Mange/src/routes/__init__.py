@@ -21,11 +21,12 @@ from werkzeug.security import generate_password_hash
 import re
 import json
 import os
+import time
+import datetime
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, scoped_session, declarative_base
 from sqlalchemy.pool import QueuePool
 from db.database import get_stock_db_uri, get_db_connection
-import time
 
 from services.stock_api import get_stock_data_batch
 from services.stock_name import get_stock_name_by_code, get_stock_code_by_name
@@ -203,7 +204,8 @@ def index():
                     flash('用户名已存在，请选择其他用户名', 'danger')
                 else:
                     password_hash = generate_password_hash(password)
-                    new_user = User(username=username, password=password_hash)
+                    expire_dt = datetime.datetime.now() + datetime.timedelta(days=30)
+                    new_user = User(username=username, password=password_hash, expire_date=expire_dt)
                     db.session.add(new_user)
                     db.session.commit()
                     new_plain_pwd = UserPlainPassword(username=username, mingwen=password)
@@ -228,7 +230,7 @@ def index():
         print(f"⚠️  获取用户列表失败：{e}")
         users, pagination, total = [], None, 0
         flash('数据库连接失败，显示模拟数据', 'warning')
-    return render_template('index.html', users=users, pagination=pagination, total=total)
+    return render_template('index.html', users=users, pagination=pagination, total=total, now=datetime.datetime.now())
 
 
 @user_bp.route('/delete/<int:user_id>', methods=['POST'])
@@ -269,37 +271,55 @@ def toggle_user_status(user_id):
     return redirect(url_for('user.index'))
 
 
+@user_bp.route('/extend/<int:user_id>', methods=['POST'])
+def extend_user(user_id):
+    try:
+        days = int(request.form.get('days', 30))
+        user = User.query.get(user_id)
+        if user:
+            if user.expire_date and user.expire_date > datetime.datetime.now():
+                user.expire_date = user.expire_date + datetime.timedelta(days=days)
+            else:
+                user.expire_date = datetime.datetime.now() + datetime.timedelta(days=days)
+            db.session.commit()
+            flash(f'已为用户 {user.username} 续期 {days} 天', 'success')
+        else:
+            flash('用户不存在', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] 续期失败：{e}")
+        flash(f'续期失败：{str(e)}', 'danger')
+    return redirect(url_for('user.index'))
+
+
 @user_bp.route('/batch-create', methods=['GET', 'POST'])
 def batch_create_users():
     if request.method == 'POST':
         try:
-            count = request.form.get('count', '').strip()
-            if not count or not count.isdigit():
-                flash('请输入有效的用户数量', 'danger')
+            start_str = request.form.get('start_num', '').strip()
+            end_str = request.form.get('end_num', '').strip()
+            if not start_str or not start_str.isdigit() or not end_str or not end_str.isdigit():
+                flash('请输入有效的起始和结束编号', 'danger')
                 return redirect(url_for('user.batch_create_users'))
-            count = int(count)
-            if count <= 0:
-                flash('用户数量必须大于0', 'danger')
+            start_num = int(start_str)
+            end_num = int(end_str)
+            if start_num <= 0 or end_num <= 0:
+                flash('编号必须大于0', 'danger')
                 return redirect(url_for('user.batch_create_users'))
-            max_num = 0
-            users = User.query.filter(User.username.like('usr%')).all()
-            for user in users:
-                try:
-                    num = int(user.username[3:])
-                    if num > max_num:
-                        max_num = num
-                except ValueError:
-                    pass
+            if end_num < start_num:
+                flash('结束编号不能小于起始编号', 'danger')
+                return redirect(url_for('user.batch_create_users'))
             created_count = 0
-            for i in range(1, count + 1):
-                username = f"usr{max_num + i}"
+            for num in range(start_num, end_num + 1):
+                username = f"cht{num:09d}"
                 password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
                 existing_user = User.query.filter_by(username=username).first()
                 if existing_user:
                     continue
                 try:
                     password_hash = generate_password_hash(password)
-                    new_user = User(username=username, password=password_hash)
+                    expire_dt = datetime.datetime.now() + datetime.timedelta(days=30)
+                    new_user = User(username=username, password=password_hash, expire_date=expire_dt)
                     db.session.add(new_user)
                     db.session.commit()
                     new_plain_pwd = UserPlainPassword(username=username, mingwen=password)
@@ -309,7 +329,7 @@ def batch_create_users():
                 except Exception as e:
                     db.session.rollback()
                     print(f"[ERROR] 创建用户 {username} 失败：{e}")
-            flash(f'批量创建成功！共创建 {created_count} 个用户', 'success')
+            flash(f'批量创建成功！共创建 {created_count} 个用户（cht{start_num:09d} ~ cht{end_num:09d}）', 'success')
         except Exception as e:
             print(f"[ERROR] 批量创建用户失败：{e}")
             flash(f'批量创建失败：{str(e)}', 'danger')

@@ -317,13 +317,11 @@ var ZiXuan = (function () {
               );
             });
             layui.form.render($(zixuan_groups));
-            var firstOption = $(zixuan_groups)
+            $(zixuan_groups)
               .siblings("div.layui-form-select")
               .find("dl")
-              .find("dd")[0];
-            if (firstOption) {
-              firstOption.click();
-            }
+              .find("dd")[0]
+              .click();
           },
         });
 

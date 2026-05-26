@@ -93,8 +93,12 @@
         
         <form method="POST">
             <div class="form-group">
-                <label for="count">要创建的用户数量：</label>
-                <input type="number" id="count" name="count" min="1" required>
+                <label for="start_num">起始编号：</label>
+                <input type="number" id="start_num" name="start_num" min="1" placeholder="例如: 1" required>
+            </div>
+            <div class="form-group">
+                <label for="end_num">结束编号：</label>
+                <input type="number" id="end_num" name="end_num" min="1" placeholder="例如: 50" required>
             </div>
             <button type="submit">批量创建</button>
         </form>

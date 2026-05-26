@@ -63,6 +63,7 @@ from chanlun.exchange.stocks_bkgn import StocksBKGN
 # print(f"[import] chanlun.exchange.stocks_bkgn: {time.time() - _import_start:.2f}s")
 
 from chanlun.tools.ai_analyse import AIAnalyse
+from chanlun.tools.ai_predict import AITrendPredict
 # print(f"[import] chanlun.tools.ai_analyse: {time.time() - _import_start:.2f}s")
 
 from chanlun.tools.cache import cache
@@ -1801,14 +1802,11 @@ def create_app(test_config=None):
         return ai_res
 
     @app.route("/ai/analyse_records/<market>", methods=["GET"])
-    # @measure_time
     @login_required
     def ai_analyse_records(market: str = "a"):
-        # 获取分页参数
         page = request.args.get("page", 1, type=int)
         limit = request.args.get("limit", 10, type=int)
 
-        # 调用分页查询
         ai_analyse_records, total = AIAnalyse(market=market).analyse_records(
             page=page, limit=limit
         )
@@ -1818,6 +1816,34 @@ def create_app(test_config=None):
             "count": total,
             "data": ai_analyse_records,
         }
+
+    @app.route("/ai/predict", methods=["POST"])
+    @login_required
+    def ai_predict():
+        market = request.form["market"]
+        code = request.form["code"]
+        frequency = request.form["frequency"]
+
+        ai_predict_obj = AITrendPredict(market)
+        return ai_predict_obj.predict(code, frequency)
+
+    @app.route("/ai/predict_records/<market>", methods=["GET"])
+    @login_required
+    def ai_predict_records(market: str = "a"):
+        code = request.args.get("code")
+        frequency = request.args.get("frequency")
+        page = request.args.get("page", 1, type=int)
+        limit = request.args.get("limit", 20, type=int)
+
+        records, total = AITrendPredict(market).prediction_records(
+            code=code, frequency=frequency, page=page, limit=limit
+        )
+        return {"code": 0, "msg": "", "count": total, "data": records}
+
+    @app.route("/ai/predict_del/<market>/<int:record_id>", methods=["POST"])
+    @login_required
+    def ai_predict_del(market: str, record_id: int):
+        return {"ok": AITrendPredict(market).delete_prediction(record_id)}
 
     @app.route("/a/bkgn_list", methods=["GET"])
     @login_required

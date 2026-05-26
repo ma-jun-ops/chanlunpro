@@ -6,7 +6,7 @@ var TvIdxFCX = (function () {
         metainfo: {
           _metainfoVersion: 53,
           id: "CustomIndicatorsHMA@tv-basicstudies-1",
-          description: "爱数女的发财线",
+          description: "东@发财线",
           shortDescription: "发财线",
           is_price_study: true,
           isCustomIndicator: true,

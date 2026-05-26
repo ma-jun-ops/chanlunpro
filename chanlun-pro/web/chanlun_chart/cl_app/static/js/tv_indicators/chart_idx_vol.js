@@ -5,18 +5,18 @@ var TvIdxVOL = (function () {
         name: "成交量",
         metainfo: {
           _metainfoVersion: 53,
-          id: "CustomIndicatorsVOL@tv-basicstudies-1_v2",
-          description: "东@成交量_v2",
-          shortDescription: "成交量_v2",
+          id: "CustomIndicatorsVOL@tv-basicstudies-1",
+          description: "东@成交量",
+          shortDescription: "成交量",
           is_price_study: false,
           isCustomIndicator: true,
           plots: [
             {
-              id: "plot_vol_down",
+              id: "plot_vol_up",
               type: "histogram",
             },
             {
-              id: "plot_vol_up",
+              id: "plot_vol_down",
               type: "histogram",
             },
             {
@@ -40,7 +40,6 @@ var TvIdxVOL = (function () {
                 transparency: 0,
                 visible: true,
                 color: "#FF3232", // COLORFF3232 红色
-                //color: "#FF3232",
                 linewidth: 2,
                 histogramBase: 0,
               },
@@ -121,10 +120,10 @@ var TvIdxVOL = (function () {
             const c = this._context.new_var(PineJS.Std.close(this._context));
             const v = this._context.new_var(PineJS.Std.volume(this._context));
 
-            // 👇👇👇【修改处】交换判断逻辑，以匹配当前 K 线颜色（红跌绿涨）
-            const vol_up = c.get(0) >= o.get(0) ? v.get(0) : NaN;   // 阳线
-            const vol_down = c.get(0) < o.get(0) ? v.get(0) : NaN;  // 阴线
-            // 👆👆👆【修改结束】
+            // STICKLINE(CLOSE>=OPEN,VOL,0,0.8,1),COLORFF3232;
+            // STICKLINE(CLOSE<OPEN,VOL,0,0.8,0),COLOR00A843;
+            const vol_up = c.get(0) >= o.get(0) ? v.get(0) : NaN;
+            const vol_down = c.get(0) < o.get(0) ? v.get(0) : NaN;
 
             // MAVOL1:MA(VOL,5),COLORFF8D1E;
             const mavol1 = PineJS.Std.sma(v, 5, this._context);
@@ -136,8 +135,8 @@ var TvIdxVOL = (function () {
             const mavol3 = PineJS.Std.sma(v, 20, this._context);
 
             return [
-              vol_down, // 0: 红色柱子 (对应阴线)
-              vol_up, // 1: 绿色柱子 (对应阳线)
+              vol_up, // 0: 上涨成交量柱状图
+              vol_down, // 1: 下跌成交量柱状图
               mavol1, // 2: 5周期成交量均线
               mavol2, // 3: 10周期成交量均线
               mavol3, // 4: 20周期成交量均线

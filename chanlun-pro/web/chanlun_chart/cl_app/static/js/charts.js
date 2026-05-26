@@ -13,6 +13,7 @@ const CHART_CONFIG = {
     BC_TEXT: "#fccbcd",
     MMD_UP: "#FA8072",
     MMD_DOWN: "#1E90FF",
+    AI_PRED: "#8E44AD",
   },
   LINE_STYLES: {
     SOLID: 0,
@@ -187,7 +188,7 @@ class ChartManager {
       symbol_search_request_delay: 100,
       auto_save_delay: 5,
       study_count_limit: 100,
-      disabled_features: ["go_to_date", "header_saveload"],
+      disabled_features: ["go_to_date"],
       enabled_features: ["study_templates", "seconds_resolution"],
       saved_data_meta_info: {
         uid: 1,
@@ -223,6 +224,7 @@ class ChartManager {
       TvIdxLTQS.idx(PineJS),
       TvIdxMA.idx(PineJS),
       TvIdxMACDBL.idx(PineJS),
+      TvIdxPinbar.idx(PineJS),
       TvIdxVegasMA.idx(PineJS),
       TvIdxVOL.idx(PineJS),
       TvIdxRSX.idx(PineJS),
@@ -233,6 +235,7 @@ class ChartManager {
   setupEventListeners() {
     // 创建几个 button 按钮
     const global_widget = this.widget;
+    const manager = this;
     this.widget.headerReady().then(function () {
       // 重新加载数据的按钮
       var buttonReload = global_widget.createButton();
@@ -270,66 +273,41 @@ class ChartManager {
           },
         });
       });
+      var buttonAiPredict = global_widget.createButton();
+      buttonAiPredict.textContent = "AI预测";
+      buttonAiPredict.addEventListener("click", function () {
+        if (window.AIPrediction) {
+          window.AIPrediction.predict(manager);
+        }
+      });
+      var buttonLoadAiPredict = global_widget.createButton();
+      buttonLoadAiPredict.textContent = "显示AI预测";
+      buttonLoadAiPredict.addEventListener("click", function () {
+        if (window.AIPrediction) {
+          window.AIPrediction.loadLatest(manager);
+        }
+      });
+      var buttonClearAiPredict = global_widget.createButton();
+      buttonClearAiPredict.textContent = "清除AI预测";
+      buttonClearAiPredict.addEventListener("click", function () {
+        if (window.AIPrediction) {
+          window.AIPrediction.clear(manager);
+        }
+      });
+      var buttonDeleteAiPredict = global_widget.createButton();
+      buttonDeleteAiPredict.textContent = "删除AI预测";
+      buttonDeleteAiPredict.addEventListener("click", function () {
+        if (window.AIPrediction) {
+          window.AIPrediction.deleteLatest(manager);
+        }
+      });
     });
-
     this.widget.onChartReady(() => {
       this.chart = this.widget.activeChart();
       if (!this.chart) {
         console.error("Failed to get active chart");
         return;
       }
-// 强制覆盖成交量指标样式（覆盖已保存的图表配置）
-      this.chart.getAllStudies().forEach((study) => {
-        if (study.name === "Volume") {
-          this.chart.getStudyById(study.id).applyOverrides({
-            "volume.color.0": "#00A843",  // Falling 跌 - 红色
-//            "volume.color.0": "#FF3232",  // Falling 跌 - 红色
-//            "volume.color.1": "#00A843",  // Growing 涨 - 绿色
-            "volume.color.1": "#FF3232",  // Growing 涨 - 绿色
-            "volume.transparency": 0,
-            "volume.linewidth": 25,
-          });
-        }
-      });
-
-
-
-      // 👇👇👇【新增代码开始】设置 K 线颜色：红涨绿跌 👇👇👇
-      // 直接修改图表配置对象
-      if (this.chart && this.chart.options) {
-        // 设置K线颜色
-        this.chart.options.candleStyle = {
-          upColor: '#ef5350',
-          downColor: '#26a69a',
-          borderUpColor: '#ef5350',
-          borderDownColor: '#26a69a',
-          wickUpColor: '#ef5350',
-          wickDownColor: '#26a69a'
-        };
-        // 设置交易量颜色
-        this.chart.options.volumeStyle = {
-          upColor: '#ef5350',
-          downColor: '#26a69a',
-          transparency: 30
-        };
-        // 应用更改
-        this.chart.applyOptions(this.chart.options);
-      }
-      // 同时使用applyOverrides作为备份
-      this.chart.applyOverrides({
-        "mainSeriesProperties.candleStyle.upColor": "#ef5350",
-        "mainSeriesProperties.candleStyle.downColor": "#26a69a",
-        "mainSeriesProperties.candleStyle.borderUpColor": "#ef5350",
-        "mainSeriesProperties.candleStyle.borderDownColor": "#26a69a",
-        "mainSeriesProperties.candleStyle.wickUpColor": "#ef5350",
-        "mainSeriesProperties.candleStyle.wickDownColor": "#26a69a",
-        "mainSeriesProperties.volumeStyle.upColor": "#ef5350",
-        "mainSeriesProperties.volumeStyle.downColor": "#26a69a",
-        "mainSeriesProperties.volumeStyle.transparency": 30
-      });
-
-      console.log("已应用颜色配置：K 线红涨绿跌，成交量同步尝试红涨绿跌");
-      // 👆👇👆【新增代码结束】 👆👆👆
 
       // 订阅事件
       this.chart
@@ -376,6 +354,9 @@ class ChartManager {
     console.log(`${this.id} 标的变化：${symbol.ticker}`);
 
     this.clear_draw_chanlun();
+    if (window.AIPrediction) {
+      window.AIPrediction.clear(this);
+    }
 
     if (typeof ZiXuan.render_zixuan_opts === "function") {
       ZiXuan.render_zixuan_opts();
@@ -392,8 +373,11 @@ class ChartManager {
     if (!market) return;
 
     Utils.set_local_data(`${market}_interval_${this.id}`, interval);
-    console.log(`${this.id} 周期变化：${interval}`);
+    console.log(`${this.id} 周期变化: ${interval}`);
 
+    if (window.AIPrediction) {
+      window.AIPrediction.clear(this);
+    }
     this.clear_draw_chanlun();
     this.debouncedDrawChanlun();
   }
@@ -412,7 +396,7 @@ class ChartManager {
     this.debouncedDrawChanlun();
   }
 
-  // 处理 tick 事件
+  // 处理tick事件
   handleTick() {
     console.log("数据更新");
     this.clear_draw_chanlun("last");
@@ -430,39 +414,41 @@ class ChartManager {
     console.log("清除已绘制的图表 : " + clear_type);
     if (clear_type == "last") {
       for (const symbolKey in this.obj_charts) {
-        for (const chartType in this.obj_charts[symbolKey]) {
-          if (this.obj_charts[symbolKey][chartType].length == 0) {
-            continue;
+        CHART_CONFIG.CHART_TYPES.forEach((chartType) => {
+          const chartItems = this.obj_charts[symbolKey][chartType] || [];
+          if (chartItems.length == 0) {
+            return;
           }
           const maxTime = Math.max(
-            ...this.obj_charts[symbolKey][chartType].map((item) => item.time)
+            ...chartItems.map((item) => item.time)
           );
-          for (const _i in this.obj_charts[symbolKey][chartType]) {
-            const item = this.obj_charts[symbolKey][chartType][_i];
+          for (const _i in chartItems) {
+            const item = chartItems[_i];
             if (item.time == maxTime) {
               item.id.then((_id) => this.chart.removeEntity(_id));
-              // console.log("remove ", symbolKey, chartType, item);
+              console.log("remove ", symbolKey, chartType, item);
             }
           }
-          this.obj_charts[symbolKey][chartType] = this.obj_charts[symbolKey][
-            chartType
-          ].filter((item) => item.time != maxTime);
-        }
+          this.obj_charts[symbolKey][chartType] = chartItems.filter(
+            (item) => item.time != maxTime
+          );
+        });
       }
     } else {
       Object.values(this.obj_charts).forEach((symbolData) => {
-        Object.values(symbolData).forEach((chartItems) => {
+        CHART_CONFIG.CHART_TYPES.forEach((chartType) => {
+          const chartItems = symbolData[chartType] || [];
           chartItems.forEach((item) => {
             try {
               item.id.then((_id) => this.chart.removeEntity(_id));
+              console.log("remove ", chartType, item);
             } catch (e) {
               console.warn("Failed to remove chart entity:", e);
             }
           });
+          symbolData[chartType] = [];
         });
       });
-      // 清空引用
-      this.obj_charts = {};
     }
   }
 
@@ -690,17 +676,23 @@ class ChartManager {
 
     const code_end = performance.now();
     console.log(
-      `${chartData.symbolKey} 运行时间：${code_end - code_start} 毫秒`
+      `${chartData.symbolKey} 运行时间: ${code_end - code_start} 毫秒`
     );
   }
 }
 
 var Charts = (function () {
+  const managers = {};
+
   return {
     // 图表展示
     show_tv_chart: function (id) {
       const chartManager = new ChartManager(id).init();
+      managers[id] = chartManager;
       return chartManager.widget;
+    },
+    get_manager: function (id) {
+      return managers[id];
     },
   };
 })();

@@ -23,6 +23,7 @@ from flask import Flask
 import os
 import sys
 import webbrowser
+from sqlalchemy import text
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -36,6 +37,7 @@ from routes import auth_bp, user_bp, follow_bp, position_bp, change_bp, stock_en
 # 导入涨跌幅计算模块
 from stock_change.calculator import create_change_table, create_star_marks_table
 from stock_change.scheduler import start_scheduler
+from prefetch.prefetch import start_prefetch
 
 # 创建Flask应用实例
 app = Flask(__name__)
@@ -81,6 +83,16 @@ if __name__ == '__main__':
                 print("[OK] 明文密码表 user_plain_passwords 创建成功")
             else:
                 print("[ERROR] 明文密码表创建失败，请手动执行SQL创建")
+            try:
+                db.session.execute(text("ALTER TABLE users ADD COLUMN expire_date DATETIME NULL"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            try:
+                db.session.execute(text("UPDATE users SET expire_date = DATE_ADD(created_at, INTERVAL 30 DAY) WHERE expire_date IS NULL"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
             print("[OK] 数据库表初始化完成")
     except Exception as e:
         print(f"[WARNING] 数据库连接失败：{e}")
@@ -108,6 +120,12 @@ if __name__ == '__main__':
         start_scheduler()
     except Exception as e:
         print(f"[WARNING] 涨跌幅定时任务启动失败：{e}")
+
+    # 第四步：启动后台预抓取
+    try:
+        start_prefetch()
+    except Exception as e:
+        print(f"[WARNING] 后台预抓取启动失败：{e}")
 
     # 打印启动信息
     print("=" * 50)

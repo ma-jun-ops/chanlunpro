@@ -102,6 +102,15 @@ IB_PORT = 7497
 IB_CLIENT_ID = 1
 IB_ACCOUNT = 'DU6941075'
 
+# AI 分析配置，统一使用 OpenAI 兼容接口调用
+# 支持服务商：siliconflow / deepseek / openrouter / openai
+# 轨迹流动（SiliconFlow）API URL：https://api.siliconflow.cn/v1/
+AI_PROVIDER = "deepseek"
+AI_API_URL = "https://api.deepseek.com"
+AI_API_KEY = ""
+AI_MODEL = "deepseek-v4-pro"
+
+
 # AI 分析配置  （硅基流动和 Openrouteai 二选一，都配置优先使用 Openrouteai）
 # 使用硅基流动的API调用模型，并返回数据
 # 邀请链接：https://cloud.siliconflow.cn/i/HwLeeOjK   （注册送 14 元）
