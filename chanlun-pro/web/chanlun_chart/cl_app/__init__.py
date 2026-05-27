@@ -679,69 +679,18 @@ def create_app(test_config=None):
             cl_config["enable_kchart_low_to_high"] == "1"
             and kchart_to_frequency is not None
         ):
-            _log("使用低级别数据模式")
             _calc_freq = frequency_low
-            cache_key = f"klines:{market}:{code}:{frequency_low}"
-            klines = cache.get(cache_key)
-            _log(f"缓存读取: {'命中' if klines else '未命中'}")
-            if klines is None:
-                _log("开始从交易所获取K线数据")
-                try:
-                    klines = ex.klines(code, frequency_low)
-                except RetryError as e:
-                    print(f"获取K线数据失败（低级别）: {code} {frequency_low} - {e}")
-                    return {"s": "no_data", "nextTime": int(time.time() + 60)}
-                if klines is None:
-                    return {"s": "no_data", "nextTime": int(time.time() + 60)}
-                _log(f"获取K线数据完成: {len(klines)}条")
-                klines_dict = klines.to_dict('records')
-                for item in klines_dict:
-                    if 'date' in item and hasattr(item['date'], 'isoformat'):
-                        item['date'] = item['date'].isoformat()
-                cache.set(cache_key, klines_dict, expire=300)
-                _log("缓存写入完成")
-            else:
-                for item in klines:
-                    if 'date' in item and isinstance(item['date'], str):
-                        try:
-                            item['date'] = pd.Timestamp(datetime.fromisoformat(item['date']))
-                        except Exception:
-                            pass
-                klines = pd.DataFrame(klines)
-                if 'date' in klines.columns:
-                    klines['date'] = pd.to_datetime(klines['date'])
-        else:
-            _log("直接获取K线数据模式")
-            kchart_to_frequency = None
-            cache_key = f"klines:{market}:{code}:{frequency}"
-            klines = cache.get(cache_key)
-            _log(f"缓存读取: {'命中' if klines else '未命中'}")
-            if klines is None:
-                _log("开始从交易所获取K线数据")
-                try:
-                    klines = ex.klines(code, frequency)
-                except RetryError as e:
-                    print(f"获取K线数据失败: {code} {frequency} - {e}")
-                    return {"s": "no_data", "nextTime": int(time.time() + 60)}
-                if klines is None:
-                    return {"s": "no_data", "nextTime": int(time.time() + 60)}
-                _log(f"获取K线数据完成: {len(klines)}条")
-                klines_dict = klines.to_dict('records')
-                for item in klines_dict:
-                    if 'date' in item and hasattr(item['date'], 'isoformat'):
-                        item['date'] = item['date'].isoformat()
-                cache.set(cache_key, klines_dict, expire=300)
-                _log("缓存写入完成")
-            else:
-                for item in klines:
-                    if 'date' in item and isinstance(item['date'], str):
-                        try:
-                            item['date'] = pd.Timestamp(datetime.fromisoformat(item['date']))
-                        except Exception:
-                            pass
-                klines = pd.DataFrame(klines)
-                if 'date' in klines.columns:
-                    klines['date'] = pd.to_datetime(klines['date'])
+
+        try:
+            klines = ex.klines(code, _calc_freq)
+        except RetryError as e:
+            print(f"获取K线数据失败: {code} {_calc_freq} - {e}")
+            return {"s": "no_data", "nextTime": int(time.time() + 60)}
+        if klines is None:
+            return {"s": "no_data", "nextTime": int(time.time() + 60)}
+
+        if klines["date"].dt.tz is not None:
+            klines["date"] = klines["date"].dt.tz_localize(None)
 
         # 如果图表指定返回的时间太早，直接返回无数据
         if int(_to) < fun.datetime_to_int(klines.iloc[0]["date"]):
@@ -761,10 +710,28 @@ def create_app(test_config=None):
 
         if cl_chart_data is None:
             _log("开始计算缠论数据")
-            cd = web_batch_get_cl_datas(
-                market, code, {_calc_freq: klines}, cl_config
-            )[0]
-            _log("缠论数据计算完成")
+            try:
+                cd = web_batch_get_cl_datas(
+                    market, code, {_calc_freq: klines}, cl_config
+                )[0]
+                _log("缠论数据计算完成")
+            except Exception as e:
+                print(f"缠论计算失败 {code} {_calc_freq}: {e}")
+                if len(klines) > 250:
+                    print(f"  降级重试: 只用最近 250 条")
+                    try:
+                        cd = web_batch_get_cl_datas(
+                            market, code, {_calc_freq: klines.tail(250)}, cl_config
+                        )[0]
+                        print(f"  降级成功")
+                    except Exception as e2:
+                        print(f"  降级也失败: {e2}")
+                        cache.set(f"cl_fail:{market}:{code}:{_calc_freq}", "1", expire=3600)
+                        return {"s": "no_data", "nextTime": int(time.time() + 3600)}
+                else:
+                    cache.set(f"cl_fail:{market}:{code}:{_calc_freq}", "1", expire=3600)
+                    return {"s": "no_data", "nextTime": int(time.time() + 3600)}
+
             _log("开始转换缠论数据为TV格式")
             cl_chart_data = cl_data_to_tv_chart(
                 cd, cl_config, to_frequency=kchart_to_frequency

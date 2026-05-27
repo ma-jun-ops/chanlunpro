@@ -259,13 +259,28 @@ class FileCacheDB(object):
                 except Exception:
                     pass
 
-        cd.process_klines(klines)
+        try:
+            cd.process_klines(klines)
+        except Exception as e:
+            print(f"缠论计算异常 {market} {code} {frequency}: {e}")
+            if file_pathname.is_file():
+                try:
+                    file_pathname.unlink()
+                    print(f"  已清理损坏缓存: {file_pathname}")
+                except Exception:
+                    pass
+            raise
 
         try:
             with open(file_pathname, "wb") as fp:
                 pickle.dump(cd, fp)
         except Exception as e:
             print(f"写入缓存异常 {market} {code} {frequency} - {e}")
+            # 清理可能已损坏的缓存文件
+            try:
+                file_pathname.unlink()
+            except Exception:
+                pass
 
         # 加一个随机概率，去清理历史的缓存，避免太多占用空间
         if random.randint(0, 1000) <= 5:

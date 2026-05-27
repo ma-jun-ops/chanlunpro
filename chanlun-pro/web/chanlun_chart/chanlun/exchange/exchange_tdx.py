@@ -125,7 +125,6 @@ class ExchangeTDX(Exchange):
             self.reset_tdx_ip()
             return self.all_stocks()
         except Exception as e:
-            print(f"获取股票列表异常: {e}，返回空列表")
             self.g_all_stocks = __all_stocks
             return __all_stocks
 
