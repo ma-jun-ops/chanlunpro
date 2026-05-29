@@ -36,6 +36,7 @@ class User(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     expire_date = db.Column(db.DateTime, nullable=True)
+    remote_id = db.Column(db.String(20), nullable=True)   # 远程Z-Blog用户ID，用于同步删除
 
     def __repr__(self):
         return f'<User {self.username}>'

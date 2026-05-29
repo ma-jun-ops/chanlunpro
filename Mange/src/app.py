@@ -93,6 +93,11 @@ if __name__ == '__main__':
                 db.session.commit()
             except Exception:
                 db.session.rollback()
+            try:
+                db.session.execute(text("ALTER TABLE users ADD COLUMN remote_id VARCHAR(20) NULL"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
             print("[OK] 数据库表初始化完成")
     except Exception as e:
         print(f"[WARNING] 数据库连接失败：{e}")

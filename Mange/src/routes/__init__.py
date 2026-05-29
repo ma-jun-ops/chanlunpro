@@ -30,6 +30,7 @@ from db.database import get_stock_db_uri, get_db_connection
 
 from services.stock_api import get_stock_data_batch
 from services.stock_name import get_stock_name_by_code, get_stock_code_by_name
+from services.remote_api import create_remote_user, delete_remote_user
 from stock_change.calculator import get_change_data, calculate_all_changes
 from models import db, User, UserPlainPassword
 import random
@@ -203,9 +204,10 @@ def index():
                 if existing_user:
                     flash('用户名已存在，请选择其他用户名', 'danger')
                 else:
+                    remote_id = create_remote_user(username, password)
                     password_hash = generate_password_hash(password)
                     expire_dt = datetime.datetime.now() + datetime.timedelta(days=30)
-                    new_user = User(username=username, password=password_hash, expire_date=expire_dt)
+                    new_user = User(username=username, password=password_hash, expire_date=expire_dt, remote_id=remote_id)
                     db.session.add(new_user)
                     db.session.commit()
                     new_plain_pwd = UserPlainPassword(username=username, mingwen=password)
@@ -238,6 +240,8 @@ def delete_user(user_id):
     try:
         user = User.query.get(user_id)
         if user:
+            if user.remote_id:
+                delete_remote_user(user.remote_id)
             plain_pwd = UserPlainPassword.query.filter_by(username=user.username).first()
             if plain_pwd:
                 db.session.delete(plain_pwd)
@@ -317,9 +321,10 @@ def batch_create_users():
                 if existing_user:
                     continue
                 try:
+                    remote_id = create_remote_user(username, password)
                     password_hash = generate_password_hash(password)
                     expire_dt = datetime.datetime.now() + datetime.timedelta(days=30)
-                    new_user = User(username=username, password=password_hash, expire_date=expire_dt)
+                    new_user = User(username=username, password=password_hash, expire_date=expire_dt, remote_id=remote_id)
                     db.session.add(new_user)
                     db.session.commit()
                     new_plain_pwd = UserPlainPassword(username=username, mingwen=password)

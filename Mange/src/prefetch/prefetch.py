@@ -7,6 +7,7 @@ import traceback
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from tools.cache import cache
 from services.stock_api import get_stock_data_batch
+from services.remote_api import list_remote_user_ids
 from db.database import get_db_connection
 
 _CHANLUN_PRO_PATH = os.path.join(
@@ -103,7 +104,36 @@ def prefetch_klines_for_chanlun():
                 pass
 
 
+def sync_remote_deletions():
+    try:
+        remote_ids = list_remote_user_ids()
+    except Exception as e:
+        print(f"[PREFETCH] 获取远程用户列表失败: {e}")
+        return
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, remote_id FROM users WHERE remote_id IS NOT NULL AND remote_id != ''")
+        local_users = cursor.fetchall()
+
+        deleted = 0
+        for u in local_users:
+            if u['remote_id'] not in remote_ids:
+                cursor.execute("DELETE FROM user_plain_passwords WHERE username = %s", (u['username'],))
+                cursor.execute("DELETE FROM users WHERE id = %s", (u['id'],))
+                conn.commit()
+                deleted += 1
+                print(f"[PREFETCH] 同步删除本地用户: {u['username']} (远程已不存在, remote_id={u['remote_id']})")
+
+        if deleted > 0:
+            print(f"[PREFETCH] 同步删除完成: {deleted} 个用户")
+    finally:
+        conn.close()
+
+
 def background_update_cache():
+    _last_sync_day = ""
     while True:
         try:
             prefetch_stock_data()
@@ -115,6 +145,15 @@ def background_update_cache():
         except Exception as e:
             print(f"[PREFETCH] 后台更新K线失败: {e}")
             traceback.print_exc()
+
+        today = time.strftime("%Y%m%d")
+        if today != _last_sync_day:
+            try:
+                sync_remote_deletions()
+                _last_sync_day = today
+            except Exception as e:
+                print(f"[PREFETCH] 远程同步失败: {e}")
+
         time.sleep(120)
 
 
