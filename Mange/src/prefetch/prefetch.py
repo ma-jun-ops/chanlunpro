@@ -32,7 +32,7 @@ INDEX_STOCKS = [
     ('SH.000688', '科创50'),
 ]
 
-
+#print
 def _get_followed_stock_codes():
     conn = get_db_connection()
     try:
